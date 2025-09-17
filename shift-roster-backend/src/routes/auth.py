@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, get_jwt_identity
 from google.auth.transport import requests
 from google.oauth2 import id_token
+from werkzeug.security import check_password_hash, generate_password_hash
 from src.models.models import db, User, Role
 from datetime import datetime
 import json
@@ -67,6 +68,46 @@ def google_auth():
         
         # Create JWT tokens
         # Identity in JWT should be a string to satisfy PyJWT 'sub' claim requirements
+        access_token = create_access_token(identity=str(user.id))
+        refresh_token = create_refresh_token(identity=str(user.id))
+
+        return jsonify({
+            'access_token': access_token,
+            'refresh_token': refresh_token,
+            'user': user.to_dict()
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@auth_bp.route('/login', methods=['POST'])
+def username_password_auth():
+    """Authenticate user with username/password"""
+    try:
+        data = request.get_json() or {}
+        username = data.get('username')
+        password = data.get('password')
+        
+        if not username or not password:
+            return jsonify({'error': 'Username and password are required'}), 400
+        
+        # Find user by username or email
+        user = User.query.filter(
+            (User.username == username) | (User.email == username)
+        ).first()
+        
+        if not user:
+            return jsonify({'error': 'Invalid username or password'}), 401
+        
+        # Check if user has a password hash (supports username/password login)
+        if not user.password_hash:
+            return jsonify({'error': 'This user can only login with Google OAuth'}), 401
+        
+        # Verify password
+        if not check_password_hash(user.password_hash, password):
+            return jsonify({'error': 'Invalid username or password'}), 401
+        
+        # Create JWT tokens
         access_token = create_access_token(identity=str(user.id))
         refresh_token = create_refresh_token(identity=str(user.id))
 

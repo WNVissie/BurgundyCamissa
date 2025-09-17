@@ -140,8 +140,10 @@ class User(db.Model):
     __tablename__ = 'users'
     
     id = db.Column(db.Integer, primary_key=True)
-    google_id = db.Column(db.String(100), unique=True, nullable=False)
+    google_id = db.Column(db.String(100), unique=True, nullable=True)  # Made nullable for username/password users
     email = db.Column(db.String(120), unique=True, nullable=False)
+    username = db.Column(db.String(50), unique=True, nullable=True)  # New field for username login
+    password_hash = db.Column(db.String(255), nullable=True)  # New field for password hash
     name = db.Column(db.String(100), nullable=False)
     surname = db.Column(db.String(100), nullable=False)
     employee_id = db.Column(db.String(50), unique=True, nullable=True)
@@ -189,6 +191,7 @@ class User(db.Model):
             'id': self.id,
             'google_id': self.google_id,
             'email': self.email,
+            'username': self.username,
             'name': self.name,
             'surname': self.surname,
             'employee_id': self.employee_id,

@@ -1,5 +1,8 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required
+from werkzeug.security import generate_password_hash
+import secrets
+import string
 from src.models.models import db, User, Role, AreaOfResponsibility, Skill, License, EmployeeLicense
 from src.utils.decorators import permission_required, get_current_user
 from datetime import datetime
@@ -86,19 +89,20 @@ def create_employee():
         data = request.get_json()
         
         # Validate required fields
-        required_fields = ['google_id', 'email', 'name', 'surname', 'role_id']
+        required_fields = ['email', 'name', 'surname', 'role_id']
         for field in required_fields:
             if field not in data:
                 return jsonify({'error': f'{field} is required'}), 400
         
         # Check if user already exists
         existing_user = User.query.filter(
-            (User.google_id == data['google_id']) | 
-            (User.email == data['email'])
+            (User.google_id == data.get('google_id')) | 
+            (User.email == data['email']) |
+            (User.username == data.get('username'))
         ).first()
         
         if existing_user:
-            return jsonify({'error': 'User with this Google ID or email already exists'}), 400
+            return jsonify({'error': 'User with this Google ID, email, or username already exists'}), 400
         
         # Validate role exists
         role = Role.query.get(data['role_id'])
@@ -113,8 +117,9 @@ def create_employee():
         
         # Create new employee
         employee = User(
-            google_id=data['google_id'],
+            google_id=data.get('google_id'),
             email=data['email'],
+            username=data.get('username'),
             name=data['name'],
             surname=data['surname'],
             employee_id=data.get('employee_id'),
@@ -129,6 +134,10 @@ def create_employee():
             total_no_leave_days_annual=data.get('total_no_leave_days_annual'),
             total_no_leave_days_annual_float=data.get('total_no_leave_days_annual')  # Initialize remaining days to same as annual
         )
+        
+        # Hash password if provided
+        if data.get('password'):
+            employee.password_hash = generate_password_hash(data['password'])
         
         db.session.add(employee)
         db.session.commit()
@@ -189,7 +198,7 @@ def update_employee(employee_id):
         
         # Admin can update all fields
         if current_user.role_ref.name == 'Admin':
-            allowed_fields = ['email', 'name', 'surname', 'employee_id', 'contact_no', 'alt_contact_name', 'alt_contact_no', 'licenses', 'designation_id', 'role_id', 'area_of_responsibility_id', 'rate_type', 'rate_value', 'total_no_leave_days_annual']
+            allowed_fields = ['email', 'username', 'password', 'name', 'surname', 'employee_id', 'contact_no', 'alt_contact_name', 'alt_contact_no', 'licenses', 'designation_id', 'role_id', 'area_of_responsibility_id', 'rate_type', 'rate_value', 'total_no_leave_days_annual']
         # Users can only update their own contact info
         elif current_user.id == employee_id:
             allowed_fields = ['contact_no']
@@ -227,6 +236,10 @@ def update_employee(employee_id):
                         employee.total_no_leave_days_annual_float = float(data[field]) - total_used_days
                     else:
                         employee.total_no_leave_days_annual_float = None
+                elif field == 'password':
+                    # Only hash and update password if a new password is provided
+                    if data[field] and data[field].strip():
+                        employee.password_hash = generate_password_hash(data[field])
                 else:
                     setattr(employee, field, data[field])
         
@@ -406,5 +419,108 @@ def remove_employee_license(employee_id, license_id):
         return jsonify({'message': 'License removed from employee'}), 200
     except Exception as e:
         db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+def generate_temporary_password(length=12):
+    """Generate a secure temporary password"""
+    # Use a mix of letters, digits, and safe special characters
+    alphabet = string.ascii_letters + string.digits + "!@#$%&*"
+    password = ''.join(secrets.choice(alphabet) for _ in range(length))
+    
+    # Ensure at least one uppercase, one lowercase, one digit, and one special char
+    if not any(c.isupper() for c in password):
+        password = password[:-1] + secrets.choice(string.ascii_uppercase)
+    if not any(c.islower() for c in password):
+        password = password[:-1] + secrets.choice(string.ascii_lowercase)
+    if not any(c.isdigit() for c in password):
+        password = password[:-1] + secrets.choice(string.digits)
+    if not any(c in "!@#$%&*" for c in password):
+        password = password[:-1] + secrets.choice("!@#$%&*")
+    
+    return password
+
+@employees_bp.route('/<int:employee_id>/reset-password', methods=['POST'])
+@permission_required('manage_employees')
+def reset_employee_password(employee_id):
+    """Reset an employee's password (Admin only)"""
+    try:
+        current_user = get_current_user()
+        if not current_user or current_user.role_ref.name != 'Admin':
+            return jsonify({'error': 'Only admin users can reset passwords'}), 403
+        
+        employee = User.query.get(employee_id)
+        if not employee:
+            return jsonify({'error': 'Employee not found'}), 404
+        
+        # Generate a new temporary password
+        new_password = generate_temporary_password()
+        employee.password_hash = generate_password_hash(new_password)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Password reset successfully',
+            'temporary_password': new_password,
+            'employee_name': f"{employee.name} {employee.surname}",
+            'username': employee.username,
+            'email': employee.email
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@employees_bp.route('/<int:employee_id>/generate-password', methods=['POST'])
+@permission_required('manage_employees')
+def generate_employee_password(employee_id):
+    """Generate a new password for an employee (Admin only)"""
+    try:
+        current_user = get_current_user()
+        if not current_user or current_user.role_ref.name != 'Admin':
+            return jsonify({'error': 'Only admin users can generate passwords'}), 403
+        
+        employee = User.query.get(employee_id)
+        if not employee:
+            return jsonify({'error': 'Employee not found'}), 404
+        
+        # Generate a new password but don't save it yet
+        new_password = generate_temporary_password()
+        
+        return jsonify({
+            'message': 'New password generated',
+            'password': new_password,
+            'employee_name': f"{employee.name} {employee.surname}",
+            'note': 'Password has been generated but not saved. Use the update endpoint to save it.'
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@employees_bp.route('/<int:employee_id>/password-info', methods=['GET'])
+@permission_required('manage_employees')
+def get_employee_password_info(employee_id):
+    """Get password status information for an employee (Admin only)"""
+    try:
+        current_user = get_current_user()
+        if not current_user or current_user.role_ref.name != 'Admin':
+            return jsonify({'error': 'Only admin users can view password information'}), 403
+        
+        employee = User.query.get(employee_id)
+        if not employee:
+            return jsonify({'error': 'Employee not found'}), 404
+        
+        return jsonify({
+            'employee_name': f"{employee.name} {employee.surname}",
+            'username': employee.username,
+            'email': employee.email,
+            'has_password': bool(employee.password_hash),
+            'has_google_auth': bool(employee.google_id),
+            'login_methods': {
+                'google_oauth': bool(employee.google_id),
+                'username_password': bool(employee.password_hash and employee.username)
+            }
+        }), 200
+        
+    except Exception as e:
         return jsonify({'error': str(e)}), 500
 
