@@ -76,6 +76,7 @@ api.interceptors.response.use(
 // Auth API
 export const authAPI = {
   login: (credentials) => api.post('/auth/google', credentials),
+  loginWithPassword: (username, password) => api.post('/auth/login', { username, password }),
   refresh: () => api.post('/auth/refresh'),
   logout: () => api.post('/auth/logout'),
   getCurrentUser: () => api.get('/auth/me'),
@@ -90,6 +91,10 @@ export const employeesAPI = {
   delete: (id) => api.delete(`/employees/${id}`),
   addSkill: (id, skillData) => api.post(`/employees/${id}/skills`, skillData),
   removeSkill: (employeeId, skillId) => api.delete(`/employees/${employeeId}/skills/${skillId}`),
+  // Password management (Admin only)
+  resetPassword: (id) => api.post(`/employees/${id}/reset-password`),
+  generatePassword: (id) => api.post(`/employees/${id}/generate-password`),
+  getPasswordInfo: (id) => api.get(`/employees/${id}/password-info`),
   // Licenses
   getEmployeeLicenses: (employeeId) => api.get(`/employees/${employeeId}/licenses`),
   addLicense: (employeeId, payload) => api.post(`/employees/${employeeId}/licenses`, payload),

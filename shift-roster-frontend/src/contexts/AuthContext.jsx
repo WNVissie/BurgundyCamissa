@@ -105,6 +105,27 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const loginWithPassword = async (username, password) => {
+    dispatch({ type: 'LOGIN_START' });
+
+    try {
+      const response = await authAPI.loginWithPassword(username, password);
+      const { access_token, refresh_token, user } = response.data;
+
+      // Store tokens and user data
+      localStorage.setItem('access_token', access_token);
+      localStorage.setItem('refresh_token', refresh_token);
+      localStorage.setItem('user', JSON.stringify(user));
+
+      dispatch({ type: 'LOGIN_SUCCESS', payload: { user } });
+      return { success: true };
+    } catch (error) {
+      const errorMessage = error.response?.data?.error || 'Login failed';
+      dispatch({ type: 'LOGIN_FAILURE', payload: errorMessage });
+      return { success: false, error: errorMessage };
+    }
+  };
+
   const logout = async () => {
     try {
       await authAPI.logout();
@@ -146,6 +167,7 @@ export function AuthProvider({ children }) {
   const value = {
     ...state,
     login,
+    loginWithPassword,
     logout,
     updateUser,
     hasPermission,

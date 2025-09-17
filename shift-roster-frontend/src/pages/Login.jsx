@@ -6,19 +6,22 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Alert, AlertDescription } from '../components/ui/alert';
-import { Calendar, AlertCircle } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { Calendar, AlertCircle, Mail, Lock, User } from 'lucide-react';
 import '../App.css';
 
 export function Login() {
   const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { login, error } = useAuth();
+  const { login, loginWithPassword, error } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   const from = location.state?.from?.pathname || '/dashboard';
 
-  const handleSubmit = async (e) => {
+  const handleGoogleLogin = async (e) => {
     e.preventDefault();
     setIsLoading(true);
 
@@ -39,31 +42,11 @@ export function Login() {
     setIsLoading(false);
   };
 
-  const handleDemoLogin = async (userType) => {
+  const handlePasswordLogin = async (e) => {
+    e.preventDefault();
     setIsLoading(true);
-    
-    const demoUsers = {
-      admin: {
-        email: 'admin@company.com',
-        google_id: 'admin123',
-        name: 'John',
-        surname: 'Admin'
-      },
-      manager: {
-        email: 'manager@company.com',
-        google_id: 'manager123',
-        name: 'Jane',
-        surname: 'Manager'
-      },
-      employee: {
-        email: 'employee1@company.com',
-        google_id: 'employee123',
-        name: 'Bob',
-        surname: 'Employee'
-      }
-    };
 
-    const result = await login(demoUsers[userType]);
+    const result = await loginWithPassword(username, password);
     
     if (result.success) {
       navigate(from, { replace: true });
@@ -91,7 +74,7 @@ export function Login() {
           <CardHeader>
             <CardTitle>Sign In</CardTitle>
             <CardDescription>
-              Enter your email to sign in with Google OAuth (Development Mode)
+              Choose your preferred sign-in method
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -102,72 +85,85 @@ export function Login() {
               </Alert>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="email">Email address</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email"
-                  required
-                  className="mt-1"
-                />
-              </div>
+            <Tabs defaultValue="password" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="password">
+                  <User className="h-4 w-4 mr-2" />
+                  Username
+                </TabsTrigger>
+                <TabsTrigger value="google">
+                  <Mail className="h-4 w-4 mr-2" />
+                  Google
+                </TabsTrigger>
+              </TabsList>
 
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={isLoading || !email}
-              >
-                {isLoading ? 'Signing in...' : 'Sign in with Google'}
-              </Button>
-            </form>
+              <TabsContent value="password">
+                <form onSubmit={handlePasswordLogin} className="space-y-4">
+                  <div>
+                    <Label htmlFor="username">Username or Email</Label>
+                    <Input
+                      id="username"
+                      type="text"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="Enter your username or email"
+                      required
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="password">Password</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Enter your password"
+                      required
+                      className="mt-1"
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={isLoading || !username || !password}
+                  >
+                    <Lock className="h-4 w-4 mr-2" />
+                    {isLoading ? 'Signing in...' : 'Sign in'}
+                  </Button>
+                </form>
+              </TabsContent>
 
-            <div className="mt-6">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-300" />
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white text-gray-500">Or try demo accounts</span>
-                </div>
-              </div>
-
-              <div className="mt-6 grid grid-cols-1 gap-3">
-                <Button
-                  variant="outline"
-                  onClick={() => handleDemoLogin('admin')}
-                  disabled={isLoading}
-                  className="w-full"
-                >
-                  Demo Admin Login
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => handleDemoLogin('manager')}
-                  disabled={isLoading}
-                  className="w-full"
-                >
-                  Demo Manager Login
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => handleDemoLogin('employee')}
-                  disabled={isLoading}
-                  className="w-full"
-                >
-                  Demo Employee Login
-                </Button>
-              </div>
-            </div>
+              <TabsContent value="google">
+                <form onSubmit={handleGoogleLogin} className="space-y-4">
+                  <div>
+                    <Label htmlFor="email">Email address</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="Enter your email"
+                      required
+                      className="mt-1"
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={isLoading || !email}
+                  >
+                    <Mail className="h-4 w-4 mr-2" />
+                    {isLoading ? 'Signing in...' : 'Sign in with Google'}
+                  </Button>
+                </form>
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
 
         <div className="text-center text-sm text-gray-600">
-          <p>Development Mode: Google OAuth simulation enabled</p>
-          <p className="mt-1">In production, this would use real Google OAuth</p>
+          <p>Secure authentication for employee management</p>
         </div>
       </div>
     </div>

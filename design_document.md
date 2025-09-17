@@ -25,8 +25,10 @@ A comprehensive employee shift roster application with React frontend and Flask 
 
 #### Users Table
 - id (Primary Key)
-- google_id (Unique, String)
+- google_id (Unique, String, nullable) - For Google OAuth users
 - email (Unique, String)
+- username (Unique, String, nullable) - For username/password login
+- password_hash (String, nullable) - Hashed password for username/password login
 - name (String)
 - surname (String)
 - employee_id (Unique, String, nullable)
@@ -152,6 +154,8 @@ A comprehensive employee shift roster application with React frontend and Flask 
 
 ### Authentication & Authorization
 - Google OAuth 2.0 integration
+- Username/Password authentication option
+- Dual login support (users can login via Google OR username/password)
 - Role-based access control (Admin, Manager, Employee, Guest)
 - JWT token management
 
@@ -191,6 +195,7 @@ A comprehensive employee shift roster application with React frontend and Flask 
 
 ### Authentication
 - POST /api/auth/google - Google OAuth login
+- POST /api/auth/login - Username/password login
 - POST /api/auth/refresh - Refresh JWT token
 - POST /api/auth/logout - Logout user
 

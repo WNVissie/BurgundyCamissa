@@ -48,7 +48,12 @@ import {
   Phone,
   MapPin,
   Award,
-  AlertCircle
+  AlertCircle,
+  Eye,
+  EyeOff,
+  Key,
+  RefreshCw,
+  Copy
 } from 'lucide-react';
 
 export function Employees() {
@@ -73,6 +78,9 @@ export function Employees() {
     employee_id: '',
     contact_no: '',
     email: '',
+    username: '',
+    password: '',
+    google_id: '',
     designation_id: '',
     role_id: '',
     area_of_responsibility_id: '',
@@ -85,6 +93,12 @@ export function Employees() {
   const [selectedLicenses, setSelectedLicenses] = useState([]); // array of license IDs (string)
   const [licenseExpiry, setLicenseExpiry] = useState({}); // { [licenseId]: 'YYYY-MM-DD' }
   const [initialLicensesMap, setInitialLicensesMap] = useState({}); // { [licenseId]: 'YYYY-MM-DD' }
+  
+  // Password management states
+  const [showPassword, setShowPassword] = useState(false);
+  const [generatedPassword, setGeneratedPassword] = useState('');
+  const [passwordInfo, setPasswordInfo] = useState(null);
+  const [showGeneratedPassword, setShowGeneratedPassword] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -121,6 +135,7 @@ export function Employees() {
         // Update logic
         const updateData = {
           email: formData.email,
+          username: formData.username,
           name: formData.name,
           surname: formData.surname,
           employee_id: formData.employee_id,
@@ -134,6 +149,10 @@ export function Employees() {
           rate_value: formData.rate_value,
           total_no_leave_days_annual: formData.total_no_leave_days_annual
         };
+        // Include password only if provided
+        if (formData.password && formData.password.trim()) {
+          updateData.password = formData.password;
+        }
         console.log('Submitting annual leave days:', formData.total_no_leave_days_annual); // <-- Add this line
         await employeesAPI.update(editingEmployee.id, updateData);
 
@@ -178,8 +197,9 @@ export function Employees() {
       } else {
         // Create logic
         const createData = {
-          google_id: `manual_${Date.now()}`,
+          google_id: formData.google_id || `manual_${Date.now()}`,
           email: formData.email,
+          username: formData.username,
           name: formData.name,
           surname: formData.surname,
           employee_id: formData.employee_id,
@@ -193,6 +213,10 @@ export function Employees() {
           rate_value: formData.rate_value,
           total_no_leave_days_annual: formData.total_no_leave_days_annual
         };
+        // Include password only if provided
+        if (formData.password && formData.password.trim()) {
+          createData.password = formData.password;
+        }
         const res = await employeesAPI.create(createData);
         const newId = res?.data?.employee?.id;
         if (newId) {
@@ -215,6 +239,9 @@ export function Employees() {
         employee_id: '',
         contact_no: '',
         email: '',
+        username: '',
+        password: '',
+        google_id: '',
         designation_id: '',
         role_id: '',
         area_of_responsibility_id: '',
@@ -227,6 +254,11 @@ export function Employees() {
       setSelectedLicenses([]);
       setLicenseExpiry({});
       setInitialLicensesMap({});
+      // Reset password states
+      setShowPassword(false);
+      setGeneratedPassword('');
+      setPasswordInfo(null);
+      setShowGeneratedPassword(false);
       fetchData();
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to save employee');
@@ -243,6 +275,9 @@ export function Employees() {
       alt_contact_name: employee.alt_contact_name || '',
       alt_contact_no: employee.alt_contact_no || '',
       email: employee.email,
+      username: employee.username || '',
+      password: '', // Never populate password field for security
+      google_id: employee.google_id || '',
       designation_id: (employee.designation_id ?? '').toString(),
       role_id: employee.role_id.toString(),
       area_of_responsibility_id: (employee.area_of_responsibility_id ?? '').toString(),
@@ -268,6 +303,12 @@ export function Employees() {
       initMap[d.license_id] = d.expiry_date || '';
     }
     setInitialLicensesMap(initMap);
+    
+    // Fetch password info for admin
+    if (isAdmin()) {
+      fetchPasswordInfo(employee.id);
+    }
+    
     setIsDialogOpen(true);
   };
 
@@ -279,6 +320,42 @@ export function Employees() {
       } catch (err) {
         setError(err.response?.data?.error || 'Failed to delete employee');
       }
+    }
+  };
+
+  const handleGeneratePassword = async (employeeId) => {
+    try {
+      const response = await employeesAPI.generatePassword(employeeId);
+      setGeneratedPassword(response.data.password);
+      setShowGeneratedPassword(true);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to generate password');
+    }
+  };
+
+  const handleResetPassword = async (employeeId) => {
+    if (window.confirm('Are you sure you want to reset this employee\'s password? They will need to use the new temporary password to login.')) {
+      try {
+        const response = await employeesAPI.resetPassword(employeeId);
+        alert(`Password reset successfully!\n\nTemporary Password: ${response.data.temporary_password}\n\nEmployee: ${response.data.employee_name}\nUsername: ${response.data.username}\nEmail: ${response.data.email}\n\nMake sure to share this password securely with the employee.`);
+        fetchData();
+      } catch (err) {
+        setError(err.response?.data?.error || 'Failed to reset password');
+      }
+    }
+  };
+
+  const handleCopyToClipboard = (text) => {
+    navigator.clipboard.writeText(text);
+    // You could add a toast notification here
+  };
+
+  const fetchPasswordInfo = async (employeeId) => {
+    try {
+      const response = await employeesAPI.getPasswordInfo(employeeId);
+      setPasswordInfo(response.data);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to fetch password info');
     }
   };
 
@@ -345,6 +422,9 @@ export function Employees() {
                   employee_id: '',
                   contact_no: '',
                   email: '',
+                  username: '',
+                  password: '',
+                  google_id: '',
                   designation_id: '',
                   role_id: '',
                   area_of_responsibility_id: '',
@@ -356,6 +436,11 @@ export function Employees() {
                 setSelectedLicenses([]);
                 setLicenseExpiry({});
                 setInitialLicensesMap({});
+                // Reset password states
+                setShowPassword(false);
+                setGeneratedPassword('');
+                setPasswordInfo(null);
+                setShowGeneratedPassword(false);
               }}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Employee
@@ -411,6 +496,136 @@ export function Employees() {
                     onChange={(e) => setFormData({...formData, email: e.target.value})}
                     required
                   />
+                </div>
+
+                {/* User Access Section */}
+                <div className="border-t pt-4 mt-4">
+                  <h3 className="text-lg font-medium mb-3">User Access</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="google_id">Google ID</Label>
+                      <Input
+                        id="google_id"
+                        value={formData.google_id}
+                        onChange={(e) => setFormData({...formData, google_id: e.target.value})}
+                        placeholder="For Google OAuth users"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="username">Username</Label>
+                      <Input
+                        id="username"
+                        value={formData.username}
+                        onChange={(e) => setFormData({...formData, username: e.target.value})}
+                        placeholder="For username/password login"
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-4">
+                    <Label htmlFor="password">Password</Label>
+                    <div className="flex gap-2">
+                      <div className="flex-1 relative">
+                        <Input
+                          id="password"
+                          type={showPassword ? "text" : "password"}
+                          value={formData.password}
+                          onChange={(e) => setFormData({...formData, password: e.target.value})}
+                          placeholder={editingEmployee ? "Leave blank to keep current password" : "Set password for username login"}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
+                          onClick={() => setShowPassword(!showPassword)}
+                        >
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                      {isAdmin() && editingEmployee && (
+                        <>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleGeneratePassword(editingEmployee.id)}
+                            className="whitespace-nowrap"
+                          >
+                            <Key className="h-4 w-4 mr-1" />
+                            Generate
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleResetPassword(editingEmployee.id)}
+                            className="whitespace-nowrap"
+                          >
+                            <RefreshCw className="h-4 w-4 mr-1" />
+                            Reset
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                    {editingEmployee && (
+                      <p className="text-sm text-gray-500 mt-1">Leave blank to keep the current password unchanged</p>
+                    )}
+                    
+                    {/* Generated Password Display */}
+                    {showGeneratedPassword && generatedPassword && (
+                      <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-blue-800">Generated Password:</span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowGeneratedPassword(false)}
+                          >
+                            <EyeOff className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <code className="flex-1 text-sm bg-white px-2 py-1 rounded border">
+                            {generatedPassword}
+                          </code>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              handleCopyToClipboard(generatedPassword);
+                              setFormData({...formData, password: generatedPassword});
+                            }}
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <p className="text-xs text-blue-600 mt-1">
+                          Click copy to use this password, or manually copy and paste it into the password field above.
+                        </p>
+                      </div>
+                    )}
+                    
+                    {/* Password Info for Admins */}
+                    {isAdmin() && editingEmployee && passwordInfo && (
+                      <div className="mt-3 p-3 bg-gray-50 border rounded-md">
+                        <h4 className="text-sm font-medium text-gray-800 mb-2">Login Methods Available:</h4>
+                        <div className="flex gap-4 text-sm">
+                          <div className={`flex items-center gap-1 ${passwordInfo.login_methods.google_oauth ? 'text-green-600' : 'text-gray-400'}`}>
+                            <Mail className="h-3 w-3" />
+                            <span>Google OAuth</span>
+                            {passwordInfo.login_methods.google_oauth && <span>✓</span>}
+                          </div>
+                          <div className={`flex items-center gap-1 ${passwordInfo.login_methods.username_password ? 'text-green-600' : 'text-gray-400'}`}>
+                            <Key className="h-3 w-3" />
+                            <span>Username/Password</span>
+                            {passwordInfo.login_methods.username_password && <span>✓</span>}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 
                 <div>
@@ -837,6 +1052,14 @@ export function Employees() {
                           onClick={() => handleEdit(employee)}
                         >
                           <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleResetPassword(employee.id)}
+                          title="Reset Password"
+                        >
+                          <Key className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
