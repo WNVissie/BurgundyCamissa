@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useAdminBadges } from '../../hooks/useAdminBadges';
 import { cn } from '../../lib/utils';
 import {
   LayoutDashboard,
@@ -17,6 +18,8 @@ import {
   X
 } from 'lucide-react';
 import { Button } from '../ui/button';
+import Badge from '../Badge';
+import NotificationPopup from '../NotificationPopup';
 
 const navigation = [
   {
@@ -85,13 +88,42 @@ const navigation = [
 export function Sidebar({ isOpen, onClose }) {
   const location = useLocation();
   const { user } = useAuth();
+  const isAdmin = user?.role?.name === 'Admin';
+  const { badges, notifications, markNotificationAsRead } = useAdminBadges(isAdmin);
 
   const filteredNavigation = navigation.filter(item => 
     item.roles.includes(user?.role?.name)
   );
 
+  // Get badge count for specific navigation item
+  const getBadgeCount = (href) => {
+    if (!isAdmin) return 0;
+    
+    switch (href) {
+      case '/timesheets':
+        return badges.timesheets;
+      case '/roster':
+        return badges.roster;
+      case '/leave':
+        return badges.leave;
+      case '/community':
+        return badges.notifications;
+      default:
+        return 0;
+    }
+  };
+
   return (
     <>
+      {/* Notification Popup for new community posts */}
+      {isAdmin && notifications.length > 0 && (
+        <NotificationPopup
+          notifications={notifications}
+          onMarkAsRead={markNotificationAsRead}
+          onClose={() => {}} // Handle close if needed
+        />
+      )}
+
       {/* Mobile overlay */}
       {isOpen && (
         <div 
@@ -147,8 +179,19 @@ export function Sidebar({ isOpen, onClose }) {
                   onClick={onClose}
                   className={linkClasses}
                 >
-                  <item.icon className="mr-3 h-5 w-5" />
-                  {item.name}
+                  <div className="flex items-center w-full">
+                    <item.icon className="mr-3 h-5 w-5" />
+                    <span className="flex-1">{item.name}</span>
+                    {isAdmin && (
+                      <div className="relative">
+                        <Badge 
+                          count={getBadgeCount(item.href)} 
+                          color="red" 
+                          className="absolute -top-2 -right-2"
+                        />
+                      </div>
+                    )}
+                  </div>
                 </Link>
               );
             })}

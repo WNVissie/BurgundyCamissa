@@ -176,6 +176,7 @@ export const leaveAPI = {
     });
   },
   deleteAttachment: (id) => api.delete(`/leave/${id}/attachment`),
+  getPendingCount: () => api.get('/leave/pending-count'),
 };
 
 // Reports API
@@ -219,6 +220,7 @@ export const rosterAPI = {
   approve: (id, data) => api.post(`/roster/${id}/approve`, data),
   createBulk: (data) => api.post('/roster/bulk', data),
   accept: (id) => api.post(`/roster/${id}/accept`),
+  getPendingCount: () => api.get('/roster/pending-count'),
 };
 
 // Analytics API
@@ -250,6 +252,13 @@ export const timesheetsAPI = {
   approve: (id) => api.post(`/timesheets/${id}/approve`),
   reject: (id, data) => api.post(`/timesheets/${id}/reject`, data),
   accept: (id) => api.post(`/timesheets/${id}/accept`),
+  getPendingCount: () => api.get('/timesheets/pending-count'),
+};
+
+// Notifications API
+export const notificationsAPI = {
+  getUnread: () => api.get('/community/notifications/unread'),
+  markAsRead: (id) => api.post(`/community/notifications/${id}/mark-read`),
 };
 
 export default api;

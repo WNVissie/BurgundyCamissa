@@ -1,0 +1,158 @@
+# 🔧 Production Environment Configuration Template
+
+# ===============================
+# PRODUCTION ENVIRONMENT VARIABLES
+# ===============================
+# Copy this file to .env in your application root directory
+# Update all values marked with "CHANGE-ME" before deployment
+
+# ===============================
+# DATABASE CONFIGURATION
+# ===============================
+DATABASE_URL=sqlite:////opt/shift-roster/data/database/app.db
+
+# ===============================
+# FLASK APPLICATION SETTINGS
+# ===============================
+FLASK_ENV=production
+DEBUG=False
+
+# ⚠️ CRITICAL: Generate a new secret key for production
+# Run: python -c "import secrets; print(secrets.token_urlsafe(32))"
+SECRET_KEY=CHANGE-ME-GENERATE-NEW-SECRET-KEY
+
+# ===============================
+# SERVER CONFIGURATION
+# ===============================
+HOST=0.0.0.0
+PORT=5001
+
+# ===============================
+# FRONTEND CONFIGURATION
+# ===============================
+# Update with your actual domain name
+FRONTEND_URL=https://CHANGE-ME-YOUR-DOMAIN.com
+CORS_ORIGINS=https://CHANGE-ME-YOUR-DOMAIN.com
+
+# ===============================
+# FILE UPLOAD SETTINGS
+# ===============================
+UPLOAD_FOLDER=/opt/shift-roster/data/uploads
+MAX_CONTENT_LENGTH=16777216
+
+# Allowed file extensions for uploads
+ALLOWED_EXTENSIONS=png,jpg,jpeg,gif,pdf,doc,docx,xls,xlsx
+
+# ===============================
+# LOGGING CONFIGURATION
+# ===============================
+LOG_LEVEL=INFO
+LOG_FILE=/opt/shift-roster/logs/application.log
+LOG_MAX_BYTES=10485760
+LOG_BACKUP_COUNT=5
+
+# ===============================
+# SECURITY SETTINGS
+# ===============================
+# Session settings
+SESSION_TIMEOUT=3600
+PERMANENT_SESSION_LIFETIME=3600
+
+# Password requirements
+MIN_PASSWORD_LENGTH=8
+REQUIRE_SPECIAL_CHARS=true
+
+# ===============================
+# EMAIL CONFIGURATION (Optional)
+# ===============================
+# Configure if you want email notifications
+MAIL_SERVER=CHANGE-ME-SMTP-SERVER
+MAIL_PORT=587
+MAIL_USE_TLS=true
+MAIL_USERNAME=CHANGE-ME-EMAIL-USERNAME
+MAIL_PASSWORD=CHANGE-ME-EMAIL-PASSWORD
+MAIL_DEFAULT_SENDER=CHANGE-ME-SENDER-EMAIL
+
+# ===============================
+# BACKUP CONFIGURATION
+# ===============================
+BACKUP_DIRECTORY=/opt/shift-roster/backups
+BACKUP_RETENTION_DAYS=30
+AUTO_BACKUP_ENABLED=true
+
+# ===============================
+# TIMEZONE SETTINGS
+# ===============================
+# Set your local timezone
+TIMEZONE=Australia/Sydney
+
+# ===============================
+# COMPANY-SPECIFIC SETTINGS
+# ===============================
+# Update with your company information
+COMPANY_NAME=CHANGE-ME-COMPANY-NAME
+COMPANY_ADDRESS=CHANGE-ME-COMPANY-ADDRESS
+COMPANY_PHONE=CHANGE-ME-PHONE-NUMBER
+COMPANY_EMAIL=CHANGE-ME-COMPANY-EMAIL
+
+# ===============================
+# PERFORMANCE SETTINGS
+# ===============================
+# Database connection pool settings
+SQLALCHEMY_POOL_SIZE=10
+SQLALCHEMY_MAX_OVERFLOW=20
+SQLALCHEMY_POOL_RECYCLE=3600
+
+# Cache settings
+CACHE_TYPE=simple
+CACHE_TIMEOUT=300
+
+# ===============================
+# MONITORING & HEALTH CHECKS
+# ===============================
+HEALTH_CHECK_ENABLED=true
+METRICS_ENABLED=false
+
+# ===============================
+# DOCKER-SPECIFIC SETTINGS
+# ===============================
+# Container resource limits
+MEMORY_LIMIT=1024m
+CPU_LIMIT=1.0
+
+# ===============================
+# DEVELOPMENT vs PRODUCTION FLAGS
+# ===============================
+IS_PRODUCTION=true
+ENABLE_DEBUG_TOOLBAR=false
+SHOW_SQL_QUERIES=false
+
+# ===============================
+# CUSTOM APPLICATION SETTINGS
+# ===============================
+# Notification system settings
+NOTIFICATION_CHECK_INTERVAL=30000
+ADMIN_NOTIFICATION_ENABLED=true
+
+# Roster settings
+DEFAULT_SHIFT_HOURS=8
+MAX_SHIFTS_PER_DAY=3
+
+# Leave request settings
+MAX_LEAVE_DAYS_ADVANCE=365
+REQUIRE_MANAGER_APPROVAL=true
+
+# ===============================
+# OPTIONAL INTEGRATIONS
+# ===============================
+# Uncomment and configure if needed
+
+# Google Analytics (if using)
+# GOOGLE_ANALYTICS_ID=CHANGE-ME-GA-ID
+
+# Sentry error tracking (if using)
+# SENTRY_DSN=CHANGE-ME-SENTRY-DSN
+
+# External API keys (if using)
+# EXTERNAL_API_KEY=CHANGE-ME-API-KEY
+# EXTERNAL_API_URL=CHANGE-ME-API-URL

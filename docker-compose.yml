@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  # Backend service
+  backend:
+    build:
+      context: ./shift-roster-backend
+      dockerfile: Dockerfile
+    ports:
+      - "5001:5001"
+    environment:
+      - FLASK_ENV=production
+      - DATABASE_URL=sqlite:///src/database/app.db
+    volumes:
+      # Mount database directory to persist data
+      - ./shift-roster-backend/src/database:/app/src/database
+      # Mount uploads directory to persist files
+      - ./shift-roster-backend/src/static/uploads:/app/src/static/uploads
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  # Frontend service
+  frontend:
+    build:
+      context: ./shift-roster-frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    environment:
+      - VITE_API_URL=http://localhost:5001/api
+    networks:
+      - app-network
+    restart: unless-stopped
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  database:
+  uploads:
