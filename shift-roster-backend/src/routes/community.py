@@ -43,6 +43,22 @@ def create_post():
         db.session.add(new_post)
         db.session.commit()
 
+        # Notify all admins of new post
+        from src.models.models import Notification, Role
+        admin_users = User.query.join(Role).filter(Role.name == 'Admin').all()
+        for admin in admin_users:
+            # Don't notify the admin who created the post
+            if admin.id != current_user.id:
+                notif = Notification(
+                    user_id=admin.id,
+                    type='community_post',
+                    ref_id=new_post.id,
+                    message=f'New community post: {title}',
+                    is_read=False
+                )
+                db.session.add(notif)
+        db.session.commit()
+
         return jsonify(new_post.to_dict()), 201
     except Exception as e:
         db.session.rollback()
@@ -113,6 +129,50 @@ def delete_post(post_id):
         db.session.commit()
 
         return jsonify({'message': 'Post deleted successfully'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@community_bp.route('/notifications/unread', methods=['GET'])
+@jwt_required()
+def get_unread_notifications():
+    """Get unread notifications for admin users."""
+    try:
+        current_user = get_current_user()
+        if current_user.role_ref.name != 'Admin':
+            return jsonify({'error': 'Forbidden'}), 403
+        
+        from src.models.models import Notification
+        notifs = Notification.query.filter_by(
+            user_id=current_user.id, 
+            is_read=False
+        ).order_by(Notification.created_at.desc()).all()
+        
+        return jsonify([n.to_dict() for n in notifs]), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@community_bp.route('/notifications/<int:notification_id>/mark-read', methods=['POST'])
+@jwt_required()
+def mark_notification_read(notification_id):
+    """Mark a notification as read."""
+    try:
+        current_user = get_current_user()
+        if current_user.role_ref.name != 'Admin':
+            return jsonify({'error': 'Forbidden'}), 403
+        
+        from src.models.models import Notification
+        notif = Notification.query.get(notification_id)
+        if not notif:
+            return jsonify({'error': 'Notification not found'}), 404
+        
+        if notif.user_id != current_user.id:
+            return jsonify({'error': 'Not authorized'}), 403
+        
+        notif.is_read = True
+        db.session.commit()
+        
+        return jsonify({'message': 'Notification marked as read'}), 200
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500

@@ -413,3 +413,13 @@ def accept_roster_entry(roster_id):
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+@roster_bp.route('/pending-count', methods=['GET'])
+@jwt_required()
+def get_pending_roster_count():
+    """Return count of pending shiftroster approvals for admin badge."""
+    current_user = get_current_user()
+    if current_user.role_ref.name != 'Admin':
+        return jsonify({'error': 'Forbidden'}), 403
+    count = ShiftRoster.query.filter_by(status='pending').count()
+    return jsonify({'pending_count': count}), 200
+

@@ -140,3 +140,13 @@ def reject_timesheet(id):
         ts.notes = data['notes']
     db.session.commit()
     return jsonify({'message': 'Timesheet rejected', 'timesheet': ts.to_dict()}), 200
+
+@timesheets_bp.route('/pending-count', methods=['GET'])
+@jwt_required()
+def get_pending_timesheet_count():
+    """Return count of pending timesheets for admin badge."""
+    current_user = get_current_user()
+    if current_user.role_ref.name != 'Admin':
+        return jsonify({'error': 'Forbidden'}), 403
+    count = Timesheet.query.filter_by(status='pending').count()
+    return jsonify({'pending_count': count}), 200

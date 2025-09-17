@@ -124,6 +124,34 @@ class License(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
 
+# Notification model for admin alerts (community posts, approvals, etc.)
+class Notification(db.Model):
+    __tablename__ = 'notifications'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)  # recipient (admin)
+    type = db.Column(db.String(50), nullable=False)  # e.g., 'community_post', 'timesheet', 'roster', 'leave'
+    ref_id = db.Column(db.Integer)  # reference to related object (e.g., post_id)
+    message = db.Column(db.Text, nullable=False)
+    is_read = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship('User', backref='notifications', lazy=True)
+
+    def __repr__(self):
+        return f'<Notification {self.type} for user {self.user_id}>'
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'type': self.type,
+            'ref_id': self.ref_id,
+            'message': self.message,
+            'is_read': self.is_read,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
 class EmployeeLicense(db.Model):
     __tablename__ = 'employee_licenses'
 
