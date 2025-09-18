@@ -1,8 +1,8 @@
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required
-from src.models.models import db, Role, AreaOfResponsibility, Skill, Shift, License
-from src.utils.decorators import permission_required, role_required
-from datetime import time
+from flask_jwt_extended import jwt_required, get_jwt_identity
+from src.models.models import db, Role, AreaOfResponsibility, Skill, Shift, License, HourlyRates, User
+from src.utils.decorators import permission_required, role_required, get_current_user
+from datetime import time, date
 import json
 
 admin_bp = Blueprint('admin', __name__)
@@ -490,5 +490,231 @@ def create_license():
         }), 201
     except Exception as e:
         db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+# Hourly Rates Management
+@admin_bp.route('/hourly-rates', methods=['GET'])
+@jwt_required()
+@role_required('Admin')
+def get_hourly_rates():
+    """Get all hourly rates with employee information"""
+    try:
+        # Get current rates (no end_date or end_date in the future)
+        rates = db.session.query(HourlyRates, User).join(
+            User, HourlyRates.employee_id == User.id
+        ).filter(
+            db.or_(
+                HourlyRates.end_date.is_(None),
+                HourlyRates.end_date > date.today()
+            )
+        ).order_by(User.name, User.surname).all()
+        
+        rates_data = []
+        for rate, employee in rates:
+            rates_data.append({
+                'rate_id': rate.rate_id,
+                'employee_id': rate.employee_id,
+                'employee_name': f"{employee.name} {employee.surname}",
+                'employee_code': employee.employee_id,
+                'rate_per_hr': float(rate.rate_per_hr),
+                'currency': rate.currency,
+                'effective_date': rate.effective_date.isoformat(),
+                'end_date': rate.end_date.isoformat() if rate.end_date else None,
+                'created_at': rate.created_at.isoformat()
+            })
+        
+        return jsonify({
+            'rates': rates_data,
+            'total': len(rates_data)
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@admin_bp.route('/hourly-rates', methods=['POST'])
+@jwt_required()
+@role_required('Admin')
+def create_hourly_rate():
+    """Create a new hourly rate"""
+    try:
+        data = request.get_json()
+        current_user = get_current_user()
+        
+        # Validate required fields
+        required_fields = ['employee_id', 'rate_per_hr']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'error': f'{field} is required'}), 400
+        
+        # Validate employee exists
+        employee = User.query.get(data['employee_id'])
+        if not employee:
+            return jsonify({'error': 'Employee not found'}), 404
+        
+        # Validate rate is positive
+        if float(data['rate_per_hr']) <= 0:
+            return jsonify({'error': 'Rate must be greater than 0'}), 400
+        
+        # Check if there's already an active rate for this employee
+        existing_rate = HourlyRates.query.filter(
+            HourlyRates.employee_id == data['employee_id'],
+            db.or_(
+                HourlyRates.end_date.is_(None),
+                HourlyRates.end_date > date.today()
+            )
+        ).first()
+        
+        if existing_rate:
+            # End the current rate
+            existing_rate.end_date = date.today()
+        
+        # Parse effective date or use today
+        effective_date = date.today()
+        if 'effective_date' in data and data['effective_date']:
+            try:
+                effective_date = date.fromisoformat(data['effective_date'])
+            except ValueError:
+                return jsonify({'error': 'Invalid effective_date format. Use YYYY-MM-DD'}), 400
+        
+        # Create new rate
+        new_rate = HourlyRates(
+            employee_id=data['employee_id'],
+            rate_per_hr=data['rate_per_hr'],
+            currency=data.get('currency', 'ZAR'),
+            effective_date=effective_date,
+            created_by=current_user.id
+        )
+        
+        db.session.add(new_rate)
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Hourly rate created successfully',
+            'rate': {
+                'rate_id': new_rate.rate_id,
+                'employee_id': new_rate.employee_id,
+                'employee_name': f"{employee.name} {employee.surname}",
+                'rate_per_hr': float(new_rate.rate_per_hr),
+                'currency': new_rate.currency,
+                'effective_date': new_rate.effective_date.isoformat(),
+                'end_date': new_rate.end_date.isoformat() if new_rate.end_date else None
+            }
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@admin_bp.route('/hourly-rates/<int:rate_id>', methods=['PUT'])
+@jwt_required()
+@role_required('Admin')
+def update_hourly_rate(rate_id):
+    """Update an hourly rate"""
+    try:
+        rate = HourlyRates.query.get(rate_id)
+        if not rate:
+            return jsonify({'error': 'Hourly rate not found'}), 404
+        
+        data = request.get_json()
+        
+        # Validate employee if changed
+        if 'employee_id' in data:
+            employee = User.query.get(data['employee_id'])
+            if not employee:
+                return jsonify({'error': 'Employee not found'}), 404
+            rate.employee_id = data['employee_id']
+        
+        if 'rate_per_hr' in data:
+            if float(data['rate_per_hr']) <= 0:
+                return jsonify({'error': 'Rate must be greater than 0'}), 400
+            rate.rate_per_hr = data['rate_per_hr']
+        
+        if 'currency' in data:
+            rate.currency = data['currency']
+        
+        if 'effective_date' in data:
+            try:
+                rate.effective_date = date.fromisoformat(data['effective_date'])
+            except ValueError:
+                return jsonify({'error': 'Invalid effective_date format. Use YYYY-MM-DD'}), 400
+        
+        if 'end_date' in data:
+            if data['end_date']:
+                try:
+                    rate.end_date = date.fromisoformat(data['end_date'])
+                except ValueError:
+                    return jsonify({'error': 'Invalid end_date format. Use YYYY-MM-DD'}), 400
+            else:
+                rate.end_date = None
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Hourly rate updated successfully',
+            'rate': {
+                'rate_id': rate.rate_id,
+                'employee_id': rate.employee_id,
+                'employee_name': f"{rate.employee.name} {rate.employee.surname}",
+                'rate_per_hr': float(rate.rate_per_hr),
+                'currency': rate.currency,
+                'effective_date': rate.effective_date.isoformat(),
+                'end_date': rate.end_date.isoformat() if rate.end_date else None
+            }
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@admin_bp.route('/hourly-rates/<int:rate_id>', methods=['DELETE'])
+@jwt_required()
+@role_required('Admin')
+def delete_hourly_rate(rate_id):
+    """Delete an hourly rate"""
+    try:
+        rate = HourlyRates.query.get(rate_id)
+        if not rate:
+            return jsonify({'error': 'Hourly rate not found'}), 404
+        
+        # Instead of deleting, we can end-date the rate
+        rate.end_date = date.today()
+        db.session.commit()
+        
+        return jsonify({'message': 'Hourly rate ended successfully'}), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@admin_bp.route('/hourly-rates/employees', methods=['GET'])
+@jwt_required()
+@role_required('Admin')
+def get_employees_for_rates():
+    """Get all employees for rate assignment dropdown"""
+    try:
+        employees = User.query.filter(User.active == True).order_by(User.name, User.surname).all()
+        
+        employee_list = []
+        for employee in employees:
+            # Check if employee has current rate
+            has_current_rate = HourlyRates.query.filter(
+                HourlyRates.employee_id == employee.id,
+                db.or_(
+                    HourlyRates.end_date.is_(None),
+                    HourlyRates.end_date > date.today()
+                )
+            ).first() is not None
+            
+            employee_list.append({
+                'id': employee.id,
+                'name': f"{employee.name} {employee.surname}",
+                'employee_id': employee.employee_id,
+                'has_current_rate': has_current_rate
+            })
+        
+        return jsonify({
+            'employees': employee_list,
+            'total': len(employee_list)
+        }), 200
+    except Exception as e:
         return jsonify({'error': str(e)}), 500
 

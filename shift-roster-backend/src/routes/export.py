@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify, send_file, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from src.models.models import User as Employee, ShiftRoster as Roster, Shift, Role, AreaOfResponsibility as Area, Skill, Timesheet
+from src.models.models import db, User, ShiftRoster as Roster, Shift, Role, AreaOfResponsibility as Area, Skill, Timesheet, LeaveRequest
 from src.utils.decorators import admin_required, manager_required
 import pandas as pd
 import io
@@ -22,7 +22,7 @@ export_bp = Blueprint('export', __name__)
 def export_employees_csv():
     """Export employees data to CSV format"""
     try:
-        employees = Employee.query.all()
+        employees = User.query.all()
 
         # Prepare data for CSV
         data = []
@@ -76,47 +76,117 @@ def export_employees_csv():
 def export_timesheets_excel():
     """Export timesheets to Excel format"""
     try:
+        print("=== EXPORT DEBUG: Starting Excel export ===")
         start_date = request.args.get('start_date')
         end_date = request.args.get('end_date')
         employee_id = request.args.get('employee_id')
+        print(f"Raw parameters: start_date='{start_date}', end_date='{end_date}', employee_id='{employee_id}'")
 
+        # Clean up empty string parameters
+        if start_date == '':
+            start_date = None
+        if end_date == '':
+            end_date = None
+        if employee_id == '':
+            employee_id = None
+        print(f"Cleaned parameters: start_date='{start_date}', end_date='{end_date}', employee_id='{employee_id}'")
+
+        print("Building query...")
         query = Timesheet.query
         if start_date:
             query = query.filter(Timesheet.date >= start_date)
+            print(f"Added start_date filter: {start_date}")
         if end_date:
             query = query.filter(Timesheet.date <= end_date)
+            print(f"Added end_date filter: {end_date}")
         if employee_id:
             query = query.filter(Timesheet.employee_id == employee_id)
+            print(f"Added employee_id filter: {employee_id}")
 
+        print("Executing query...")
         timesheets = query.all()
+        print(f"Found {len(timesheets)} timesheets")
 
-        data = []
-        for ts in timesheets:
-            employee = ts.employee
-            shift = ts.roster.shift if ts.roster else None
-            approved_by = ts.timesheet_approver.name if ts.timesheet_approver else 'Pending'
+        if not timesheets:
+            print("No timesheets found, creating empty response")
+            # Return simple DataFrame for empty results
+            df = pd.DataFrame([{'Message': 'No timesheets found for the selected criteria'}])
+        else:
+            print("Processing timesheets...")
+            data = []
+            for i, ts in enumerate(timesheets):
+                print(f"Processing timesheet {i+1}/{len(timesheets)}: ID={ts.id}")
+                
+                # Create a row with proper data
+                row = {
+                    'Date': str(ts.date) if ts.date else 'N/A',
+                    'Employee ID': 'N/A',
+                    'Employee Name': 'N/A', 
+                    'Shift': 'N/A',
+                    'Hours Worked': float(ts.hours_worked) if ts.hours_worked else 0.0,
+                    'Status': str(ts.status) if ts.status else 'Unknown',
+                    'Approved By': 'Pending',
+                    'Notes': str(ts.notes) if ts.notes else ''
+                }
+                
+                # Get employee info safely
+                try:
+                    if hasattr(ts, 'employee') and ts.employee:
+                        row['Employee ID'] = str(ts.employee.employee_id) if ts.employee.employee_id else 'N/A'
+                        row['Employee Name'] = f"{ts.employee.name} {ts.employee.surname}" if (ts.employee.name and ts.employee.surname) else 'N/A'
+                        print(f"  Employee: {row['Employee Name']}")
+                except Exception as e:
+                    print(f"  Employee error: {str(e)}")
+                
+                # Get shift info safely
+                try:
+                    if hasattr(ts, 'roster') and ts.roster:
+                        if hasattr(ts.roster, 'shift') and ts.roster.shift:
+                            row['Shift'] = str(ts.roster.shift.name) if ts.roster.shift.name else 'N/A'
+                            print(f"  Shift: {row['Shift']}")
+                except Exception as e:
+                    print(f"  Shift error: {str(e)}")
+                
+                # Get approver info safely
+                try:
+                    if hasattr(ts, 'timesheet_approver') and ts.timesheet_approver:
+                        approver_name = f"{ts.timesheet_approver.name} {ts.timesheet_approver.surname}" if (ts.timesheet_approver.name and ts.timesheet_approver.surname) else 'N/A'
+                        row['Approved By'] = approver_name
+                        print(f"  Approved by: {row['Approved By']}")
+                except Exception as e:
+                    print(f"  Approver error: {str(e)}")
+                
+                data.append(row)
+                print(f"  Row added successfully")
+            
+            print(f"Creating DataFrame with {len(data)} rows...")
+            df = pd.DataFrame(data)
 
-            data.append({
-                'Date': ts.date.strftime('%Y-%m-%d'),
-                'Employee ID': employee.employee_id,
-                'Employee Name': f"{employee.name} {employee.surname}",
-                'Shift': shift.name if shift else 'N/A',
-                'Hours Worked': ts.hours_worked,
-                'Status': ts.status.title(),
-                'Approved By': approved_by
-            })
-
-        df = pd.DataFrame(data)
+        print("Creating Excel file...")
         output = io.BytesIO()
-
+        
+        print("Writing to Excel...")
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             df.to_excel(writer, sheet_name='Timesheets', index=False)
-            worksheet = writer.sheets['Timesheets']
-            for column in worksheet.columns:
-                max_length = max(df[column.column].astype(str).map(len).max(), len(column.column))
-                worksheet.column_dimensions[column.column_letter].width = max_length + 2
+            print("Excel write completed")
 
         output.seek(0)
+        print("Seeking to start of file")
+        
+        print("=== EXPORT DEBUG: Sending file ===")
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=f'timesheets_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+        )
+
+    except Exception as e:
+        print(f"=== EXPORT ERROR: {str(e)} ===")
+        print(f"Exception type: {type(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
         return send_file(
             output,
@@ -144,7 +214,7 @@ def export_roster_grid_excel():
         end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
 
         # Fetch all employees and roster entries for the period
-        employees = Employee.query.order_by(Employee.name).all()
+        employees = User.query.order_by(User.name).all()
         roster_entries = Roster.query.filter(Roster.date.between(start_date, end_date)).all()
 
         # Create a map for quick lookup
@@ -195,7 +265,7 @@ def export_roster_grid_excel():
 def export_employees_excel():
     """Export employees data to Excel format"""
     try:
-        employees = Employee.query.all()
+        employees = User.query.all()
 
         # Prepare data for Excel
         data = []
@@ -504,7 +574,7 @@ def export_timesheets_pdf():
         for timesheet in timesheets:
             employee = timesheet.employee
             shift = timesheet.roster.shift if timesheet.roster else None
-            approved_by = timesheet.timesheet_approver.name if timesheet.timesheet_approver else 'Pending'
+            approved_by = f"{timesheet.timesheet_approver.name} {timesheet.timesheet_approver.surname}" if timesheet.timesheet_approver else 'Pending'
             
             data.append([
                 timesheet.date.strftime('%Y-%m-%d'),
@@ -702,5 +772,229 @@ def export_analytics_pdf():
         )
         
     except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@export_bp.route('/reports/shift-acceptance/excel', methods=['GET'])
+@jwt_required()
+@manager_required
+def export_shift_acceptance_excel():
+    """Export shift acceptance report to Excel format"""
+    try:
+        from sqlalchemy import and_
+        start_date_str = request.args.get('start_date')
+        end_date_str = request.args.get('end_date')
+
+        query = db.session.query(Roster, Shift, User).join(
+            Shift, Roster.shift_id == Shift.id
+        ).join(
+            User, Roster.employee_id == User.id
+        ).filter(
+            Roster.status.in_(['approved', 'accepted'])
+        )
+
+        if start_date_str:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            query = query.filter(Roster.date >= start_date)
+        if end_date_str:
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+            query = query.filter(Roster.date <= end_date)
+
+        roster_entries = query.order_by(Roster.date, Roster.employee_id).all()
+
+        # Format the data for Excel
+        data = []
+        for roster, shift, user in roster_entries:
+            approved_by = roster.approver.name + ' ' + roster.approver.surname if roster.approver else 'N/A'
+            data.append({
+                'Employee': f"{user.name} {user.surname}",
+                'Date': roster.date.strftime('%Y-%m-%d'),
+                'Shift': shift.name,
+                'Hours': shift.hours if shift else 0,
+                'Status': roster.status,
+                'Approved By': approved_by,
+                'Approved Time': roster.approved_at.strftime('%Y-%m-%d %H:%M:%S') if roster.approved_at else 'N/A',
+                'Accepted Time': roster.accepted_at.strftime('%Y-%m-%d %H:%M:%S') if roster.accepted_at else 'N/A'
+            })
+
+        df = pd.DataFrame(data)
+        output = io.BytesIO()
+
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, sheet_name='Shift Acceptance Report', index=False)
+
+        output.seek(0)
+
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=f'shift_acceptance_report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+        )
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@export_bp.route('/reports/employee-history/excel', methods=['GET'])
+@jwt_required()
+@manager_required
+def export_employee_history_excel():
+    """Export employee history report to Excel format"""
+    try:
+        employee_id = request.args.get('employee_id', type=int)
+        if not employee_id:
+            return jsonify({'error': 'employee_id is required'}), 400
+
+        employee = User.query.get(employee_id)
+        if not employee:
+            return jsonify({'error': 'Employee not found'}), 404
+
+        # Get all shift roster entries for this employee
+        history = Roster.query.filter_by(employee_id=employee_id).order_by(Roster.date.desc()).all()
+
+        # Format the data for Excel
+        data = []
+        for entry in history:
+            shift = entry.shift
+            approved_by = entry.approver.name + ' ' + entry.approver.surname if entry.approver else 'N/A'
+            data.append({
+                'Date': entry.date.strftime('%Y-%m-%d'),
+                'Shift': shift.name if shift else '',
+                'Status': entry.status,
+                'Hours': shift.hours if shift else 0,
+                'Approved At': entry.approved_at.strftime('%Y-%m-%d %H:%M:%S') if entry.approved_at else 'N/A',
+                'Accepted At': entry.accepted_at.strftime('%Y-%m-%d %H:%M:%S') if entry.accepted_at else 'N/A',
+                'Approved By': approved_by
+            })
+
+        df = pd.DataFrame(data)
+        output = io.BytesIO()
+
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            # Employee info sheet
+            emp_info = pd.DataFrame([{
+                'Employee ID': employee.employee_id,
+                'Name': f"{employee.name} {employee.surname}",
+                'Email': employee.email,
+                'Role': employee.role_ref.name if employee.role_ref else '',
+                'Area': employee.area_ref.name if employee.area_ref else ''
+            }])
+            emp_info.to_excel(writer, sheet_name='Employee Info', index=False)
+            
+            # History data
+            df.to_excel(writer, sheet_name='Shift History', index=False)
+
+        output.seek(0)
+
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=f'employee_history_{employee.name}_{employee.surname}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+        )
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@export_bp.route('/reports/leave-requests/excel', methods=['GET'])
+@jwt_required()
+@manager_required
+def export_leave_requests_excel():
+    """Export leave requests report to Excel format"""
+    try:
+        print("=== LEAVE REQUESTS EXCEL EXPORT DEBUG ===")
+        employee_id = request.args.get('employee_id', type=int)
+        status = request.args.get('status')
+        leave_type = request.args.get('leave_type')
+        start_date_str = request.args.get('start_date')
+        end_date_str = request.args.get('end_date')
+        
+        print(f"Params received: employee_id={employee_id}, status={status}, leave_type={leave_type}")
+        
+        # Build query - use the same pattern as working exports
+        print("Building query...")
+        query = db.session.query(LeaveRequest, User).join(
+            User, LeaveRequest.employee_id == User.id
+        )
+        
+        if employee_id:
+            query = query.filter(LeaveRequest.employee_id == employee_id)
+            print(f"Added employee filter: {employee_id}")
+        if status and status != 'all':
+            query = query.filter(LeaveRequest.status == status)
+            print(f"Added status filter: {status}")
+        if leave_type:
+            query = query.filter(LeaveRequest.leave_type == leave_type)
+            print(f"Added leave_type filter: {leave_type}")
+        if start_date_str:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            query = query.filter(LeaveRequest.start_date >= start_date)
+            print(f"Added start_date filter: {start_date}")
+        if end_date_str:
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+            query = query.filter(LeaveRequest.end_date <= end_date)
+            print(f"Added end_date filter: {end_date}")
+        
+        print("Executing query...")
+        leave_entries = query.order_by(LeaveRequest.start_date.desc()).all()
+        print(f"Found {len(leave_entries)} leave requests")
+
+        # Format the data for Excel
+        data = []
+        for i, (leave, user) in enumerate(leave_entries):
+            try:
+                print(f"Processing leave request {i+1}/{len(leave_entries)}: ID={leave.id}")
+                
+                if not user:
+                    print(f"  WARNING: Leave request {leave.id} has no user!")
+                    continue
+                    
+                approved_by = leave.approver.name + ' ' + leave.approver.surname if leave.approver else ''
+                days_value = float(leave.days) if leave.days is not None else 0
+                print(f"  Days: {days_value}")
+                
+                data.append({
+                    'Employee': f"{user.name} {user.surname}",
+                    'Leave Type': leave.leave_type,
+                    'Start Date': leave.start_date.strftime('%Y-%m-%d'),
+                    'End Date': leave.end_date.strftime('%Y-%m-%d'),
+                    'Days': days_value,
+                    'Status': leave.status,
+                    'Reason': leave.reason or '',
+                    'Applied Date': leave.created_at.strftime('%Y-%m-%d') if leave.created_at else '',
+                    'Approved By': approved_by,
+                    'Comments': leave.action_comment or ''
+                })
+                print(f"  Successfully processed leave request {leave.id}")
+            except Exception as e:
+                print(f"  ERROR processing leave request {leave.id}: {str(e)}")
+                import traceback
+                traceback.print_exc()
+                continue
+
+        print(f"Creating DataFrame with {len(data)} rows...")
+        df = pd.DataFrame(data)
+        output = io.BytesIO()
+
+        print("Writing to Excel...")
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, sheet_name='Leave Requests', index=False)
+
+        output.seek(0)
+        print("Excel file created successfully, sending response...")
+
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=f'leave_requests_report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+        )
+
+    except Exception as e:
+        print(f"=== LEAVE REQUESTS EXCEL EXPORT ERROR: {str(e)} ===")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 

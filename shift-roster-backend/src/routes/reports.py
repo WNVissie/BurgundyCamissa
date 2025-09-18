@@ -181,12 +181,17 @@ def employee_search_report():
 def shift_acceptance_report():
     """
     Report on employees who have accepted or not yet accepted their shifts.
+    Includes total hours per shift.
     """
     try:
         start_date_str = request.args.get('start_date')
         end_date_str = request.args.get('end_date')
 
-        query = ShiftRoster.query.filter(
+        query = db.session.query(ShiftRoster, Shift, User).join(
+            Shift, ShiftRoster.shift_id == Shift.id
+        ).join(
+            User, ShiftRoster.employee_id == User.id
+        ).filter(
             ShiftRoster.status.in_(['approved', 'accepted'])
         )
 
@@ -199,7 +204,22 @@ def shift_acceptance_report():
 
         roster_entries = query.order_by(ShiftRoster.date, ShiftRoster.employee_id).all()
 
-        return jsonify([entry.to_dict() for entry in roster_entries]), 200
+        # Format the response to include hours
+        result = []
+        total_hours = 0
+        for roster, shift, user in roster_entries:
+            entry_data = roster.to_dict()
+            entry_data['shift_hours'] = shift.hours if shift else 0
+            entry_data['employee_name'] = f"{user.name} {user.surname}" if user else "Unknown"
+            entry_data['shift_name'] = shift.name if shift else "Unknown"
+            result.append(entry_data)
+            total_hours += shift.hours if shift else 0
+
+        return jsonify({
+            'entries': result, 
+            'total_hours': total_hours,
+            'total_shifts': len(result)
+        }), 200
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
