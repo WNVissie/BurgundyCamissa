@@ -32,8 +32,6 @@ export function Dashboard() {
       setLoading(true);
       if (isAdmin() || isManager()) {
         const response = await analyticsAPI.getDashboard();
-        console.log('Dashboard API Response:', response.data); // Debug log
-        console.log('Metrics:', response.data.metrics); // Debug log
         setMetrics(response.data.metrics);
         setRecentActivity(response.data.recent_activity || []);
       }

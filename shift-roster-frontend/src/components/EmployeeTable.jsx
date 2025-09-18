@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { employeesAPI, areasAPI, designationsAPI, skillsAPI, rosterAPI, leaveAPI } from '../lib/api';
+import api, { employeesAPI, areasAPI, designationsAPI, skillsAPI, rosterAPI, leaveAPI } from '../lib/api';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -19,7 +19,7 @@ import {
   TableRow,
 } from './ui/table';
 import { Badge } from './ui/badge';
-import { Filter, X, Users } from 'lucide-react';
+import { Filter, X, Users, FileSpreadsheet, FileType } from 'lucide-react';
 
 export function EmployeeTable() {
   const [employees, setEmployees] = useState([]);
@@ -270,6 +270,94 @@ export function EmployeeTable() {
     });
   };
 
+  // Export functions
+  const exportToExcel = async (data, filename) => {
+    if (!data || data.length === 0) {
+      alert('No data to export');
+      return;
+    }
+
+    try {
+      // Call backend API for proper Excel export
+      const response = await api.get('/export/employees/excel', { 
+        responseType: 'blob' 
+      });
+
+      // Handle backend Excel file download
+      const blob = new Blob([response.data], { 
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${filename}_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert('Export failed. Please try again.');
+    }
+  };
+
+  const exportToPDF = async (data, filename, title) => {
+    if (!data || data.length === 0) {
+      alert('No data to export');
+      return;
+    }
+
+    // Format data for export
+    const exportData = data.map(emp => ({
+      'Employee ID': emp.employee_id || emp.id,
+      'Name': `${emp.name || emp.first_name || ''} ${emp.surname || emp.last_name || ''}`,
+      'Email': emp.email || '',
+      'Area': emp.area_ref ? emp.area_ref.name : (emp.area_name || emp.area || ''),
+      'Designation': emp.designation_ref ? emp.designation_ref.name : (emp.designation_name || emp.designation || ''),
+      'Status': emp.current_status || emp.status || (emp.is_active ? 'Active' : 'Inactive'),
+      'Skills': emp.skills ? emp.skills.map(skill => skill.name || skill).join(', ') : ''
+    }));
+
+    const headers = Object.keys(exportData[0]);
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>${title}</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          h1 { color: #333; margin-bottom: 20px; }
+          table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background-color: #f2f2f2; font-weight: bold; }
+          tr:nth-child(even) { background-color: #f9f9f9; }
+        </style>
+      </head>
+      <body>
+        <h1>${title}</h1>
+        <table>
+          <thead>
+            <tr>
+              ${headers.map(header => `<th>${header}</th>`).join('')}
+            </tr>
+          </thead>
+          <tbody>
+            ${exportData.map(row => 
+              `<tr>${headers.map(header => `<td>${row[header] || ''}</td>`).join('')}</tr>`
+            ).join('')}
+          </tbody>
+        </table>
+      </body>
+      </html>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
   // Check if any filters are active
   const hasActiveFilters = Object.values(filters).some(filter => filter !== '');
 
@@ -307,6 +395,26 @@ export function EmployeeTable() {
             <Badge variant="outline">
               {filteredEmployees.length} of {employees.length} employees
             </Badge>
+            {filteredEmployees.length > 0 && (
+              <div className="flex space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => exportToExcel(filteredEmployees, 'employee-directory')}
+                >
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  Export Excel
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => exportToPDF(filteredEmployees, 'employee-directory', 'Employee Directory')}
+                >
+                  <FileType className="h-4 w-4 mr-2" />
+                  Export PDF
+                </Button>
+              </div>
+            )}
             {hasActiveFilters && (
               <Button 
                 variant="outline" 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { rolesAPI, areasAPI, skillsAPI, shiftsAPI, licensesAPI } from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -17,6 +18,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '../components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select';
 import {
   Table,
   TableBody,
@@ -39,6 +47,7 @@ import {
 } from 'lucide-react';
 
 export function Admin() {
+  const { user, isAdmin } = useAuth();
   const [roles, setRoles] = useState([]);
   const [areas, setAreas] = useState([]);
   const [skills, setSkills] = useState([]);
@@ -47,6 +56,13 @@ export function Admin() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('roles');
+
+  // Add debug logging for user privileges
+  useEffect(() => {
+    console.log('Admin page - Current user:', user);
+    console.log('Admin page - Is admin?', isAdmin());
+    console.log('Admin page - User role:', user?.role_ref?.name);
+  }, [user, isAdmin]);
   
   // Dialog states
   const [isRoleDialogOpen, setIsRoleDialogOpen] = useState(false);
@@ -79,13 +95,13 @@ export function Admin() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [rolesRes, areasRes, skillsRes, shiftsRes, licensesRes] = await Promise.all([
-        rolesAPI.getAll(),
-        areasAPI.getAll(),
-        skillsAPI.getAll(),
-        shiftsAPI.getAll(),
-        licensesAPI.getAll() // <-- Add this line
-      ]);
+      
+      // Make API calls with individual error handling
+      const rolesRes = await rolesAPI.getAll();
+      const areasRes = await areasAPI.getAll();
+      const skillsRes = await skillsAPI.getAll();
+      const shiftsRes = await shiftsAPI.getAll();
+      const licensesRes = await licensesAPI.getAll();
       
       setRoles(rolesRes.data.roles || []);
       setAreas(areasRes.data.areas || []);

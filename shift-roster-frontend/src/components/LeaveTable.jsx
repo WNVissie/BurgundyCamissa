@@ -11,7 +11,7 @@ import {
   TableRow,
 } from './ui/table';
 import { Badge } from './ui/badge';
-import { X, FileText, Search } from 'lucide-react';
+import { X, FileText, Search, FileType } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
 export function LeaveTable() {
@@ -104,6 +104,67 @@ export function LeaveTable() {
     setActiveStatusView('all'); // Reset status view to 'all'
   };
 
+  // Export function
+  const exportToPDF = (data, filename, title) => {
+    if (!data || data.length === 0) {
+      alert('No data to export');
+      return;
+    }
+
+    // Format data for export
+    const exportData = data.map(leave => ({
+      'Employee': leave.employee ? `${leave.employee.name} ${leave.employee.surname}` : (leave.employee_name || leave.name || ''),
+      'Leave Type': leave.leave_type || '',
+      'Start Date': leave.start_date || '',
+      'End Date': leave.end_date || '',
+      'Days': leave.days || leave.total_days || 0,
+      'Status': leave.status || '',
+      'Reason': leave.reason || '',
+      'Applied Date': leave.created_at ? new Date(leave.created_at).toLocaleDateString() : 
+                     (leave.applied_date ? new Date(leave.applied_date).toLocaleDateString() : ''),
+      'Approved By': leave.approver ? `${leave.approver.name} ${leave.approver.surname}` : 
+                     (leave.approved_by_name || '')
+    }));
+
+    const headers = Object.keys(exportData[0]);
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>${title}</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          h1 { color: #333; margin-bottom: 20px; }
+          table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background-color: #f2f2f2; font-weight: bold; }
+          tr:nth-child(even) { background-color: #f9f9f9; }
+        </style>
+      </head>
+      <body>
+        <h1>${title}</h1>
+        <table>
+          <thead>
+            <tr>
+              ${headers.map(header => `<th>${header}</th>`).join('')}
+            </tr>
+          </thead>
+          <tbody>
+            ${exportData.map(row => 
+              `<tr>${headers.map(header => `<td>${row[header] || ''}</td>`).join('')}</tr>`
+            ).join('')}
+          </tbody>
+        </table>
+      </body>
+      </html>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
   const getStatusBadgeVariant = (status) => {
     switch (status?.toLowerCase()) {
       case 'approved':
@@ -160,11 +221,25 @@ export function LeaveTable() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center gap-2">
-        <FileText className="h-5 w-5" />
-        <h3 className="text-lg font-semibold">
-          Leave Requests ({filteredLeaveRequests.length})
-        </h3>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <FileText className="h-5 w-5" />
+          <h3 className="text-lg font-semibold">
+            Leave Requests ({filteredLeaveRequests.length})
+          </h3>
+        </div>
+        {filteredLeaveRequests.length > 0 && (
+          <div className="flex space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportToPDF(filteredLeaveRequests, 'leave-requests', 'Leave Requests')}
+            >
+              <FileType className="h-4 w-4 mr-2" />
+              Export PDF
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Status View Tabs */}

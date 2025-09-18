@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { reportsAPI, skillsAPI, licensesAPI, rolesAPI, areasAPI, designationsAPI, employeesAPI } from '../lib/api';
+import api, { reportsAPI, skillsAPI, licensesAPI, rolesAPI, areasAPI, designationsAPI, employeesAPI } from '../lib/api';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from '../components/ui/table';
-import { FileText, Search, Calendar as CalendarIcon, Filter, X } from 'lucide-react';
+import { FileText, Search, Calendar as CalendarIcon, Filter, X, Download, FileSpreadsheet, FileType, ChevronDown, ChevronRight, Users, Clock } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
 import { Calendar } from '../components/ui/calendar';
@@ -29,7 +29,12 @@ export function Reports() {
 
   // State for acceptance report
   const [acceptanceReportData, setAcceptanceReportData] = useState([]);
+  const [acceptanceReportSummary, setAcceptanceReportSummary] = useState(null);
   const [acceptanceReportLoading, setAcceptanceReportLoading] = useState(false);
+  
+  // State for collapsible sections
+  const [isEmployeeDirectoryExpanded, setIsEmployeeDirectoryExpanded] = useState(false);
+  const [isLeaveDirectoryExpanded, setIsLeaveDirectoryExpanded] = useState(false);
   const [dateRange, setDateRange] = useState({
     from: new Date(),
     to: new Date(new Date().setDate(new Date().getDate() + 7)),
@@ -201,13 +206,229 @@ export function Reports() {
         end_date: dateRange.to ? format(dateRange.to, 'yyyy-MM-dd') : undefined,
       };
       const res = await reportsAPI.shiftAcceptance(params);
-      setAcceptanceReportData(res.data);
+      
+      // Handle new response format with entries and summary
+      if (res.data.entries) {
+        setAcceptanceReportData(res.data.entries);
+        setAcceptanceReportSummary({
+          total_hours: res.data.total_hours,
+          total_shifts: res.data.total_shifts
+        });
+      } else {
+        // Fallback for old response format
+        setAcceptanceReportData(res.data);
+        setAcceptanceReportSummary(null);
+      }
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to generate acceptance report.');
       setAcceptanceReportData([]);
+      setAcceptanceReportSummary(null);
     } finally {
       setAcceptanceReportLoading(false);
     }
+  };
+
+  // Export helper functions
+  const exportToExcel = async (data, filename, headers = null) => {
+    if (!data || data.length === 0) {
+      alert('No data to export');
+      return;
+    }
+
+    try {
+      let response;
+      
+      if (filename === 'shift-acceptance-report') {
+        // Call backend API for proper Excel export
+        const params = {
+          start_date: dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : undefined,
+          end_date: dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : undefined
+        };
+        response = await api.get('/export/reports/shift-acceptance/excel', { 
+          params, 
+          responseType: 'blob' 
+        });
+      } else if (filename === 'employee-history-report') {
+        // Call backend API for employee history
+        const params = {
+          employee_id: selectedEmployeeForHistory
+        };
+        response = await api.get('/export/reports/employee-history/excel', { 
+          params, 
+          responseType: 'blob' 
+        });
+      } else {
+        // Fallback to frontend CSV generation for other reports
+        const exportData = data.map(row => {
+          const formattedRow = {};
+          const csvHeaders = headers || Object.keys(row);
+          csvHeaders.forEach(header => {
+            const value = row[header];
+            // Handle object values by converting to string
+            if (typeof value === 'object' && value !== null) {
+              if (Array.isArray(value)) {
+                formattedRow[header] = value.map(item => 
+                  typeof item === 'object' && item !== null ? (item.name || JSON.stringify(item)) : item
+                ).join(', ');
+              } else {
+                formattedRow[header] = value.name || JSON.stringify(value);
+              }
+            } else {
+              formattedRow[header] = value || '';
+            }
+          });
+          return formattedRow;
+        });
+
+        // Create CSV content
+        const csvHeaders = Object.keys(exportData[0]);
+        const csvContent = [
+          csvHeaders.join(','),
+          ...exportData.map(row => 
+            csvHeaders.map(header => {
+              const value = row[header] || '';
+              // Escape commas and quotes
+              return typeof value === 'string' && (value.includes(',') || value.includes('"')) 
+                ? `"${value.replace(/"/g, '""')}"` 
+                : value;
+            }).join(',')
+          )
+        ].join('\n');
+
+        // Download CSV file
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        if (link.download !== undefined) {
+          const url = URL.createObjectURL(blob);
+          link.setAttribute('href', url);
+          link.setAttribute('download', `${filename}.csv`);
+          link.style.visibility = 'hidden';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }
+        return;
+      }
+
+      // Handle backend Excel file download
+      const blob = new Blob([response.data], { 
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${filename}_${format(new Date(), 'yyyyMMdd_HHmmss')}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert('Export failed. Please try again.');
+    }
+  };
+
+  const exportToPDF = (data, filename, title) => {
+    if (!data || data.length === 0) {
+      alert('No data to export');
+      return;
+    }
+
+    // Debug logging to see data structure
+    console.log('PDF Export Debug - Data structure:', data);
+    console.log('PDF Export Debug - First entry:', data[0]);
+
+    // Format data based on report type
+    let exportData;
+    if (filename === 'shift-acceptance-report') {
+      exportData = data.map(entry => {
+        console.log('Processing entry for PDF:', entry);
+        const hours = entry.shift_hours || (entry.shift ? entry.shift.hours : 0);
+        console.log('Hours value:', hours);
+        
+        return {
+          'Employee': entry.employee_name || (entry.employee ? `${entry.employee.name} ${entry.employee.surname}` : ''),
+          'Date': entry.date || '',
+          'Shift': entry.shift_name || (entry.shift ? entry.shift.name : ''),
+          'Hours': hours,
+          'Status': entry.status || 'pending',
+          'Approved By': entry.approver ? `${entry.approver.name} ${entry.approver.surname}` : 'N/A',
+          'Approved Time': entry.approved_at ? new Date(entry.approved_at).toLocaleString() : 'N/A',
+          'Accepted Time': entry.accepted_at ? new Date(entry.accepted_at).toLocaleString() : 'N/A'
+        };
+      });
+    } else if (filename === 'employee-history-report') {
+      exportData = data.map(entry => ({
+        'Date': entry.date || '',
+        'Shift': entry.shift ? entry.shift.name : '',
+        'Status': entry.status || '',
+        'Hours': entry.shift ? entry.shift.hours : 0,
+        'Approved At': entry.approved_at ? new Date(entry.approved_at).toLocaleString() : 'N/A',
+        'Accepted At': entry.accepted_at ? new Date(entry.accepted_at).toLocaleString() : 'N/A'
+      }));
+    } else {
+      // Default handling for other reports
+      exportData = data.map(row => {
+        const formattedRow = {};
+        Object.keys(row).forEach(key => {
+          const value = row[key];
+          // Handle object values by converting to string
+          if (typeof value === 'object' && value !== null) {
+            if (Array.isArray(value)) {
+              formattedRow[key] = value.map(item => 
+                typeof item === 'object' && item !== null ? (item.name || JSON.stringify(item)) : item
+              ).join(', ');
+            } else {
+              formattedRow[key] = value.name || JSON.stringify(value);
+            }
+          } else {
+            formattedRow[key] = value || '';
+          }
+        });
+        return formattedRow;
+      });
+    }
+
+    // Create HTML content for PDF
+    const headers = Object.keys(exportData[0]);
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>${title}</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          h1 { color: #333; margin-bottom: 20px; }
+          table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background-color: #f2f2f2; font-weight: bold; }
+          tr:nth-child(even) { background-color: #f9f9f9; }
+        </style>
+      </head>
+      <body>
+        <h1>${title}</h1>
+        <table>
+          <thead>
+            <tr>
+              ${headers.map(header => `<th>${header}</th>`).join('')}
+            </tr>
+          </thead>
+          <tbody>
+            ${exportData.map(row => 
+              `<tr>${headers.map(header => `<td>${row[header] || ''}</td>`).join('')}</tr>`
+            ).join('')}
+          </tbody>
+        </table>
+      </body>
+      </html>
+    `;
+
+    // Open in new window for printing
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+    printWindow.print();
   };
 
   // TEMPORARILY REMOVED - Leave report functions
@@ -247,8 +468,33 @@ export function Reports() {
 
   return (
     <div className="space-y-6">
-      {/* Employee Directory with Table Filters - WORKING SOLUTION */}
-      <EmployeeTable />
+      {/* Employee Directory Report - Collapsible */}
+      <Card>
+        <CardHeader>
+          <CardTitle 
+            className="flex items-center justify-between cursor-pointer hover:text-blue-600 transition-colors"
+            onClick={() => setIsEmployeeDirectoryExpanded(!isEmployeeDirectoryExpanded)}
+          >
+            <div className="flex items-center">
+              <Users className="h-5 w-5 mr-2" />
+              Employee Directory Report
+            </div>
+            {isEmployeeDirectoryExpanded ? (
+              <ChevronDown className="h-5 w-5" />
+            ) : (
+              <ChevronRight className="h-5 w-5" />
+            )}
+          </CardTitle>
+          <CardDescription>
+            Browse and filter the complete employee directory with export options
+          </CardDescription>
+        </CardHeader>
+        {isEmployeeDirectoryExpanded && (
+          <CardContent>
+            <EmployeeTable />
+          </CardContent>
+        )}
+      </Card>
 
       {/* Original Advanced Employee Report - Keep for reference */}
       <Card style={{ display: 'none' }}>
@@ -406,6 +652,26 @@ export function Reports() {
             <Button onClick={handleAcceptanceReportSearch} disabled={acceptanceReportLoading}>
               {acceptanceReportLoading ? 'Generating...' : 'Generate Report'}
             </Button>
+            {safeAcceptanceReportData.length > 0 && (
+              <div className="flex space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => exportToExcel(safeAcceptanceReportData, 'shift-acceptance-report')}
+                >
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  Export Excel
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => exportToPDF(safeAcceptanceReportData, 'shift-acceptance-report', 'Shift Acceptance Report')}
+                >
+                  <FileType className="h-4 w-4 mr-2" />
+                  Export PDF
+                </Button>
+              </div>
+            )}
           </div>
           {safeAcceptanceReportData.length > 0 && (
             <Table>
@@ -414,6 +680,7 @@ export function Reports() {
                   <TableHead>Employee</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Shift</TableHead>
+                  <TableHead>Hours</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Approved By</TableHead>
                   <TableHead>Approved Time</TableHead>
@@ -423,9 +690,14 @@ export function Reports() {
               <TableBody>
                 {safeAcceptanceReportData.map(entry => (
                   <TableRow key={entry.id}>
-                    <TableCell>{entry.employee?.name} {entry.employee?.surname}</TableCell>
+                    <TableCell>{entry.employee_name || (entry.employee?.name + ' ' + entry.employee?.surname)}</TableCell>
                     <TableCell>{entry.date}</TableCell>
-                    <TableCell>{entry.shift?.name}</TableCell>
+                    <TableCell>{entry.shift_name || entry.shift?.name}</TableCell>
+                    <TableCell>
+                      <span className="font-mono">
+                        {entry.shift_hours || entry.shift?.hours || 0} hrs
+                      </span>
+                    </TableCell>
                     <TableCell>
                       <Badge 
                         variant={
@@ -458,6 +730,23 @@ export function Reports() {
               </TableBody>
             </Table>
           )}
+
+          {/* Summary Section */}
+          {acceptanceReportSummary && (
+            <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+              <h4 className="font-semibold text-lg mb-2">Summary</h4>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="font-medium">Total Shifts:</span>
+                  <span className="ml-2">{acceptanceReportSummary.total_shifts}</span>
+                </div>
+                <div>
+                  <span className="font-medium">Total Hours:</span>
+                  <span className="ml-2 font-mono">{acceptanceReportSummary.total_hours} hrs</span>
+                </div>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -482,6 +771,26 @@ export function Reports() {
           <Button onClick={handleHistorySearch} disabled={historyLoading || !selectedEmployeeForHistory}>
             {historyLoading ? 'Loading...' : 'View History'}
           </Button>
+          {historyReport && historyReport.shifts && (
+            <div className="flex space-x-2 ml-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => exportToExcel(historyReport.shifts, 'employee-history-report')}
+              >
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Export Excel
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => exportToPDF(historyReport.shifts, 'employee-history-report', `History for ${historyReport.employee_details?.name} ${historyReport.employee_details?.surname}`)}
+              >
+                <FileType className="h-4 w-4 mr-2" />
+                Export PDF
+              </Button>
+            </div>
+          )}
         </CardContent>
         {historyReport && historyReport.employee_details && (
           <CardContent>
@@ -567,17 +876,29 @@ export function Reports() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center">
-            <FileText className="h-5 w-5 mr-2" />
-            Leave Directory
+          <CardTitle 
+            className="flex items-center justify-between cursor-pointer hover:text-blue-600 transition-colors"
+            onClick={() => setIsLeaveDirectoryExpanded(!isLeaveDirectoryExpanded)}
+          >
+            <div className="flex items-center">
+              <Clock className="h-5 w-5 mr-2" />
+              Leave Directory Report
+            </div>
+            {isLeaveDirectoryExpanded ? (
+              <ChevronDown className="h-5 w-5" />
+            ) : (
+              <ChevronRight className="h-5 w-5" />
+            )}
           </CardTitle>
           <CardDescription>
-            View all leave requests in the system.
+            View and manage all leave requests in the system with export options
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <LeaveTable />
-        </CardContent>
+        {isLeaveDirectoryExpanded && (
+          <CardContent>
+            <LeaveTable />
+          </CardContent>
+        )}
       </Card>
     </div>
   );

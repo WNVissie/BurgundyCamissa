@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from src.models.models import db, Role, AreaOfResponsibility, Skill, Shift, License, HourlyRates, User
 from src.utils.decorators import permission_required, role_required, get_current_user
-from datetime import time, date
+from datetime import time, date, datetime
 import json
 
 admin_bp = Blueprint('admin', __name__)
@@ -499,7 +499,17 @@ def create_license():
 def get_hourly_rates():
     """Get all hourly rates with employee information"""
     try:
-        # Get current rates (no end_date or end_date in the future)
+        print(f"========== ADMIN HOURLY RATES DEBUG ==========")
+        print(f"Fetching hourly rates at {datetime.now()}")
+        
+        # First, get ALL rates to debug
+        all_rates = db.session.query(HourlyRates, User).join(
+            User, HourlyRates.employee_id == User.id
+        ).order_by(User.name, User.surname).all()
+        
+        print(f"Total rates in database: {len(all_rates)}")
+        
+        # Now filter for current rates (no end_date or end_date in the future)
         rates = db.session.query(HourlyRates, User).join(
             User, HourlyRates.employee_id == User.id
         ).filter(
@@ -508,6 +518,16 @@ def get_hourly_rates():
                 HourlyRates.end_date > date.today()
             )
         ).order_by(User.name, User.surname).all()
+        
+        print(f"Current rates after filtering: {len(rates)}")
+        print(f"Today's date for comparison: {date.today()}")
+        
+        # Debug: Show all rates with their end dates
+        for rate, employee in all_rates:
+            print(f"  Rate ID {rate.rate_id}: {employee.name} {employee.surname} - "
+                  f"Rate: R{rate.rate_per_hr} - End Date: {rate.end_date}")
+        
+        print(f"===============================================")
         
         rates_data = []
         for rate, employee in rates:
@@ -691,7 +711,11 @@ def delete_hourly_rate(rate_id):
 def get_employees_for_rates():
     """Get all employees for rate assignment dropdown"""
     try:
-        employees = User.query.filter(User.active == True).order_by(User.name, User.surname).all()
+        print(f"========== ADMIN EMPLOYEES DEBUG ==========")
+        print(f"Fetching employees at {datetime.now()}")
+        
+        employees = User.query.order_by(User.name, User.surname).all()
+        print(f"Total employees: {len(employees)}")
         
         employee_list = []
         for employee in employees:
@@ -703,6 +727,8 @@ def get_employees_for_rates():
                     HourlyRates.end_date > date.today()
                 )
             ).first() is not None
+            
+            print(f"  Employee {employee.id}: {employee.name} {employee.surname} - Has current rate: {has_current_rate}")
             
             employee_list.append({
                 'id': employee.id,

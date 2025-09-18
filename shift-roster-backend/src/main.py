@@ -149,6 +149,12 @@ def create_app():
     @app.route('/', defaults={'path': ''})
     @app.route('/<path:path>')
     def serve(path):
+        # Don't intercept API routes - let blueprints handle them
+        if path.startswith('api/'):
+            # This should not happen as blueprints should handle API routes
+            # Return 404 to indicate API endpoint not found
+            return {"error": "API endpoint not found"}, 404
+            
         static_folder_path = app.static_folder
         if static_folder_path is None:
             return "Static folder not configured", 404
