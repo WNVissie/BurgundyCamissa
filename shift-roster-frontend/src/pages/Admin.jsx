@@ -37,6 +37,7 @@ import {
   Plus, 
   Edit, 
   Trash2, 
+  Trash,
   Shield, 
   MapPin, 
   Award, 
