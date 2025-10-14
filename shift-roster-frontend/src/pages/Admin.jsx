@@ -1,3 +1,65 @@
+  // Hourly Rates management
+  const fetchHourlyRates = async () => {
+    try {
+      const res = await hourlyRatesAPI.getAll();
+      setHourlyRates(res.data || []);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to fetch hourly rates');
+    }
+  };
+
+  const fetchEmployees = async () => {
+    try {
+      const res = await employeesAPI.getAll();
+      setEmployees(res.data.employees || []);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to fetch employees');
+    }
+  };
+
+  useEffect(() => {
+    fetchHourlyRates();
+    fetchEmployees();
+  }, []);
+
+  const handleHourlyRateSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      if (editingHourlyRate) {
+        await hourlyRatesAPI.update(editingHourlyRate.id, hourlyRateForm);
+      } else {
+        await hourlyRatesAPI.create(hourlyRateForm);
+      }
+      setIsHourlyRateDialogOpen(false);
+      setEditingHourlyRate(null);
+      setHourlyRateForm({ employee_id: '', rate_per_hr: '', effective_date: '', end_date: '' });
+      fetchHourlyRates();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to save hourly rate');
+    }
+  };
+
+  const handleHourlyRateEdit = (rate) => {
+    setEditingHourlyRate(rate);
+    setHourlyRateForm({
+      employee_id: rate.employee_id,
+      rate_per_hr: rate.rate_per_hr,
+      effective_date: rate.effective_date,
+      end_date: rate.end_date || ''
+    });
+    setIsHourlyRateDialogOpen(true);
+  };
+
+  const handleHourlyRateDelete = async (id) => {
+    if (window.confirm('Are you sure you want to delete this hourly rate?')) {
+      try {
+        await hourlyRatesAPI.delete(id);
+        fetchHourlyRates();
+      } catch (err) {
+        setError(err.response?.data?.error || 'Failed to delete hourly rate');
+      }
+    }
+  };
 import React, { useState, useEffect } from 'react';
 import { rolesAPI, areasAPI, skillsAPI, shiftsAPI, licensesAPI, designationsAPI, hourlyRatesAPI, employeesAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -1187,6 +1249,81 @@ export function Admin() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Hourly Rate Dialog */}
+      <Dialog open={isHourlyRateDialogOpen} onOpenChange={setIsHourlyRateDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {editingHourlyRate ? 'Edit Hourly Rate' : 'Add New Hourly Rate'}
+            </DialogTitle>
+            <DialogDescription>
+              {editingHourlyRate ? 'Update hourly rate information.' : 'Create a new hourly rate for an employee.'}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleHourlyRateSubmit} className="space-y-4">
+            <div>
+              <Label htmlFor="employee-select">Employee</Label>
+              <Select
+                value={hourlyRateForm.employee_id}
+                onValueChange={(val) => setHourlyRateForm({ ...hourlyRateForm, employee_id: val })}
+                required
+              >
+                <SelectTrigger id="employee-select">
+                  <SelectValue placeholder="Select employee" />
+                </SelectTrigger>
+                <SelectContent>
+                  {employees.map((emp) => (
+                    <SelectItem key={emp.id} value={emp.id.toString()}>
+                      {emp.name} {emp.surname} ({emp.email})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="rate-per-hr">Hourly Rate (R)</Label>
+              <Input
+                id="rate-per-hr"
+                type="number"
+                min="0"
+                step="0.01"
+                value={hourlyRateForm.rate_per_hr}
+                onChange={(e) => setHourlyRateForm({ ...hourlyRateForm, rate_per_hr: e.target.value })}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="effective-date">Effective Date</Label>
+              <Input
+                id="effective-date"
+                type="date"
+                value={hourlyRateForm.effective_date}
+                onChange={(e) => setHourlyRateForm({ ...hourlyRateForm, effective_date: e.target.value })}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="end-date">End Date</Label>
+              <Input
+                id="end-date"
+                type="date"
+                value={hourlyRateForm.end_date}
+                onChange={(e) => setHourlyRateForm({ ...hourlyRateForm, end_date: e.target.value })}
+                placeholder="Optional"
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsHourlyRateDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit">
+                {editingHourlyRate ? 'Update Hourly Rate' : 'Add Hourly Rate'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Designation Dialog */}
       <Dialog open={isDesignationDialogOpen} onOpenChange={setIsDesignationDialogOpen}>
