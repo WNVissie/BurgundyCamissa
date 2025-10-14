@@ -147,8 +147,9 @@ def get_weekly_approval_trends():
         return jsonify({'data': sorted_trends}), 200
 
     except Exception as e:
-        # For debugging, it can be helpful to log the error
-        # print(f"Error in get_weekly_approval_trends: {e}")
+        import traceback
+        print("Error in get_weekly_approval_trends:", e)
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @analytics_bp.route('/employees-by-shift', methods=['GET'])
