@@ -54,7 +54,7 @@ export function Admin() {
   const fetchHourlyRates = async () => {
     try {
       const res = await hourlyRatesAPI.getAll();
-      setHourlyRates(res.data || []);
+      setHourlyRates(res.data.rates || []);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to fetch hourly rates');
     }
