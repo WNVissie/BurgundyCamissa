@@ -108,7 +108,8 @@ export function Admin() {
       const skillsRes = await skillsAPI.getAll();
       const shiftsRes = await shiftsAPI.getAll();
       const licensesRes = await licensesAPI.getAll();
-      const designationsRes = await designationsAPI.getAll();
+  const designationsRes = await designationsAPI.getAll();
+  console.log("Designations API response:", designationsRes);
       
       setRoles(rolesRes.data.roles || []);
       setAreas(areasRes.data.areas || []);
@@ -597,8 +598,8 @@ export function Admin() {
                 </TableHeader>
                 <TableBody>
                   {designations.map((designation) => (
-                    <TableRow key={designation.id}>
-                      <TableCell className="font-medium">{designation.name}</TableCell>
+                    <TableRow key={designation.designation_id}>
+                      <TableCell className="font-medium">{designation.designation_name}</TableCell>
                       <TableCell>{designation.description || '-'}</TableCell>
                       <TableCell className="text-right space-x-2">
                         <Button
