@@ -30,5 +30,5 @@ ENV PYTHONPATH=/app
 # Expose port
 EXPOSE 5001
 
-# Command to run the application
-CMD ["python", "src/main.py"]
+# Command to run the application with Gunicorn
+CMD ["gunicorn", "--bind", "0.0.0.0:5001", "--workers", "2", "--timeout", "120", "src.main:app"]
