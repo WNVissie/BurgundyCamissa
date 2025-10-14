@@ -76,10 +76,13 @@ def create_app():
         return jsonify({'error': 'Fresh token required'}), 401
     
     # Configure CORS to be specific to API routes, preventing conflicts with static file serving.
-    # Allow frontend origin for development
+    # Allow frontend origin for development and production
+    # Get CORS origins from environment variable or use defaults
+    cors_origins = os.getenv('CORS_ORIGINS', 'https://burgundycamissa.netlify.app,http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:5177,http://127.0.0.1:5173,http://127.0.0.1:5174,http://127.0.0.1:5175,http://127.0.0.1:5176,http://127.0.0.1:5177').split(',')
+    
     CORS(app, 
          supports_credentials=True,
-         origins=['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:5176', 'http://localhost:5177', 'http://127.0.0.1:5173', 'http://127.0.0.1:5174', 'http://127.0.0.1:5175', 'http://127.0.0.1:5176', 'http://127.0.0.1:5177'],
+         origins=cors_origins,
          allow_headers=['Content-Type', 'Authorization', 'Access-Control-Allow-Credentials'],
          methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
          expose_headers=['Authorization'])

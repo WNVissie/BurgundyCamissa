@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Create axios instance with base configuration
 const api = axios.create({
-  baseURL: import.meta.env.PROD ? '/api' : 'http://localhost:5001/api',
+  baseURL: import.meta.env.VITE_API_URL || (import.meta.env.PROD ? 'https://burgundycamissa-1.onrender.com/api' : 'http://localhost:5001/api'),
   headers: { 'Content-Type': 'application/json' },
 });
 
