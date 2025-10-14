@@ -120,10 +120,14 @@ def get_weekly_approval_trends():
         start_of_period = today - timedelta(days=today.weekday()) - timedelta(weeks=11)
 
         # Query weekly trends
-        # Use func.strftime with '%Y-%W' to group by week number
-        # This works for SQLite and PostgreSQL, though syntax can vary for other DBs
+        # Use correct function for week grouping depending on DB
+        db_url = str(db.engine.url)
+        if 'postgresql' in db_url:
+            week_func = func.to_char(ShiftRoster.date, 'IYYY-IW')
+        else:
+            week_func = func.strftime('%Y-%W', ShiftRoster.date)
         weekly_data = db.session.query(
-            func.strftime('%Y-%W', ShiftRoster.date).label('week'),
+            week_func.label('week'),
             ShiftRoster.status,
             func.count(ShiftRoster.id).label('count')
         ).filter(
