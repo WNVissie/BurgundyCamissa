@@ -106,3 +106,8 @@ Instructions.md
 API_DOCUMENTATION.md
 tatus
 todo.md
+
+# Admin creation scripts (contain sensitive database credentials)
+create_admin.py
+create_admin_simple.py
+create_admin_user.sql
