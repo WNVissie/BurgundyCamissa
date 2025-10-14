@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  # Backend service
+  backend:
+    build:
+      context: ./shift-roster-backend
+      dockerfile: Dockerfile
+    ports:
+      - "5001:5001"
+    environment:
+      - FLASK_ENV=production
+      - DATABASE_URL=sqlite:///src/database/app.db
+    volumes:
+      # Mount database directory to persist data
+      - ./data/database:/app/src/database
+      # Mount uploads directory to persist files
+      - ./data/uploads:/app/src/static/uploads
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Frontend service
+  frontend:
+    build:
+      context: ./shift-roster-frontend
+      dockerfile: Dockerfile
+    ports:
+      - "80:3000"  # Production port
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      - VITE_API_URL=http://localhost:5001/api
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  database:
+  uploads:
