@@ -122,31 +122,44 @@ def create_app():
     # Create database tables and apply lightweight migrations
     with app.app_context():
         db.create_all()
-        # Lightweight migration for new columns/tables when using SQLite
+        # Lightweight migration for new columns/tables
+        # Skip migration checks for PostgreSQL as db.create_all() handles schema
         try:
-            from sqlalchemy import text
+            from sqlalchemy import text, inspect
             from sqlalchemy.exc import OperationalError
-            with db.engine.connect() as conn:
-                cols = conn.execute(text("PRAGMA table_info(users)")).fetchall()
-                col_names = {c[1] for c in cols}
-                alter_stmts = []
-                if 'alt_contact_name' not in col_names:
-                    alter_stmts.append("ALTER TABLE users ADD COLUMN alt_contact_name VARCHAR(100)")
-                if 'alt_contact_no' not in col_names:
-                    alter_stmts.append("ALTER TABLE users ADD COLUMN alt_contact_no VARCHAR(20)")
-                # ...existing code...
-                for stmt in alter_stmts:
-                    try:
-                        conn.execute(text(stmt))
-                    except OperationalError:
-                        pass
+            
+            # Check if we're using PostgreSQL or SQLite
+            db_url = str(db.engine.url)
+            is_postgres = 'postgresql' in db_url
+            
+            if not is_postgres:
+                # SQLite-specific migration code
+                with db.engine.connect() as conn:
+                    cols = conn.execute(text("PRAGMA table_info(users)")).fetchall()
+                    col_names = {c[1] for c in cols}
+                    alter_stmts = []
+                    if 'alt_contact_name' not in col_names:
+                        alter_stmts.append("ALTER TABLE users ADD COLUMN alt_contact_name VARCHAR(100)")
+                    if 'alt_contact_no' not in col_names:
+                        alter_stmts.append("ALTER TABLE users ADD COLUMN alt_contact_no VARCHAR(20)")
+                    
+                    for stmt in alter_stmts:
+                        try:
+                            conn.execute(text(stmt))
+                        except OperationalError:
+                            pass
 
-                # Ensure licenses table exists
-                conn.execute(text("CREATE TABLE IF NOT EXISTS licenses (id INTEGER PRIMARY KEY, name VARCHAR(100) UNIQUE NOT NULL, description TEXT, created_at DATETIME)"))
-                # Ensure employee_licenses table exists
-                conn.execute(text("CREATE TABLE IF NOT EXISTS employee_licenses (id INTEGER PRIMARY KEY, employee_id INTEGER NOT NULL, license_id INTEGER NOT NULL, expiry_date DATE, created_at DATETIME, FOREIGN KEY(employee_id) REFERENCES users(id), FOREIGN KEY(license_id) REFERENCES licenses(id))"))
-        except Exception:
+                    # Ensure licenses table exists
+                    conn.execute(text("CREATE TABLE IF NOT EXISTS licenses (id INTEGER PRIMARY KEY, name VARCHAR(100) UNIQUE NOT NULL, description TEXT, created_at DATETIME)"))
+                    # Ensure employee_licenses table exists
+                    conn.execute(text("CREATE TABLE IF NOT EXISTS employee_licenses (id INTEGER PRIMARY KEY, employee_id INTEGER NOT NULL, license_id INTEGER NOT NULL, expiry_date DATE, created_at DATETIME, FOREIGN KEY(employee_id) REFERENCES users(id), FOREIGN KEY(license_id) REFERENCES licenses(id))"))
+            else:
+                # For PostgreSQL, db.create_all() handles everything
+                # Just ensure tables exist
+                print("PostgreSQL detected - using db.create_all() for schema management")
+        except Exception as e:
             # Best-effort; ignore if migration check fails
+            print(f"Migration check skipped: {e}")
             pass
     
     @app.route('/', defaults={'path': ''})
