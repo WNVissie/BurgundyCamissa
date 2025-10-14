@@ -123,8 +123,10 @@ def get_weekly_approval_trends():
         # Use correct function for week grouping depending on DB
         db_url = str(db.engine.url)
         if 'postgresql' in db_url:
+            # ISO week (Monday as first day), e.g., 2024-23
             week_func = func.to_char(ShiftRoster.date, 'IYYY-IW')
         else:
+            # SQLite
             week_func = func.strftime('%Y-%W', ShiftRoster.date)
         weekly_data = db.session.query(
             week_func.label('week'),
@@ -132,7 +134,7 @@ def get_weekly_approval_trends():
             func.count(ShiftRoster.id).label('count')
         ).filter(
             ShiftRoster.date >= start_of_period
-        ).group_by('week', ShiftRoster.status).order_by('week').all()
+        ).group_by(week_func, ShiftRoster.status).order_by(week_func).all()
 
         # Process data into a structured format
         trends = {}
