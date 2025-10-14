@@ -115,24 +115,29 @@ def create_employee():
             if not area:
                 return jsonify({'error': 'Invalid area of responsibility ID'}), 400
         
+        # Helper function to convert empty strings to None for numeric/optional fields
+        def clean_value(value):
+            """Convert empty string to None, otherwise return value"""
+            return None if value == '' or value is None else value
+        
         # Create new employee
         employee = User(
-            google_id=data.get('google_id'),
+            google_id=data.get('google_id') or data.get('email'),  # Use email as fallback for google_id
             email=data['email'],
             username=data.get('username'),
             name=data['name'],
             surname=data['surname'],
             employee_id=data.get('employee_id'),
-            contact_no=data.get('contact_no'),
-            alt_contact_name=data.get('alt_contact_name'),
-            alt_contact_no=data.get('alt_contact_no'),
-            designation_id=data.get('designation_id'),
+            contact_no=data.get('contact_no', ''),
+            alt_contact_name=clean_value(data.get('alt_contact_name')),
+            alt_contact_no=clean_value(data.get('alt_contact_no')),
+            designation_id=clean_value(data.get('designation_id')),
             role_id=data['role_id'],
-            area_of_responsibility_id=data.get('area_of_responsibility_id'),
-            rate_type=data.get('rate_type'),
-            rate_value=data.get('rate_value'),
-            total_no_leave_days_annual=data.get('total_no_leave_days_annual'),
-            total_no_leave_days_annual_float=data.get('total_no_leave_days_annual')  # Initialize remaining days to same as annual
+            area_of_responsibility_id=clean_value(data.get('area_of_responsibility_id')),
+            rate_type=clean_value(data.get('rate_type')),
+            rate_value=clean_value(data.get('rate_value')),
+            total_no_leave_days_annual=clean_value(data.get('total_no_leave_days_annual')),
+            total_no_leave_days_annual_float=clean_value(data.get('total_no_leave_days_annual'))  # Initialize remaining days to same as annual
         )
         
         # Hash password if provided
@@ -196,6 +201,11 @@ def update_employee(employee_id):
         
         data = request.get_json()
         
+        # Helper function to convert empty strings to None for numeric/optional fields
+        def clean_value(value):
+            """Convert empty string to None, otherwise return value"""
+            return None if value == '' or value is None else value
+        
         # Admin can update all fields
         if current_user.role_ref.name == 'Admin':
             allowed_fields = ['email', 'username', 'password', 'name', 'surname', 'employee_id', 'contact_no', 'alt_contact_name', 'alt_contact_no', 'licenses', 'designation_id', 'role_id', 'area_of_responsibility_id', 'rate_type', 'rate_value', 'total_no_leave_days_annual']
@@ -240,6 +250,9 @@ def update_employee(employee_id):
                     # Only hash and update password if a new password is provided
                     if data[field] and data[field].strip():
                         employee.password_hash = generate_password_hash(data[field])
+                elif field in ['rate_type', 'rate_value', 'alt_contact_name', 'alt_contact_no', 'designation_id', 'area_of_responsibility_id']:
+                    # Clean numeric and optional fields - convert empty strings to None
+                    setattr(employee, field, clean_value(data[field]))
                 else:
                     setattr(employee, field, data[field])
         
