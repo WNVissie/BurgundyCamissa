@@ -416,13 +416,14 @@ export function Admin() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="roles">Roles</TabsTrigger>
           <TabsTrigger value="designations">Designations</TabsTrigger>
           <TabsTrigger value="areas">Areas</TabsTrigger>
           <TabsTrigger value="skills">Skills</TabsTrigger>
           <TabsTrigger value="shifts">Shifts</TabsTrigger>
           <TabsTrigger value="licenses">Licenses</TabsTrigger>
+          <TabsTrigger value="hourlyrates">Hourly Rates</TabsTrigger>
         </TabsList>
 
         {/* Roles Tab */}
@@ -556,6 +557,74 @@ export function Admin() {
                             variant="ghost" 
                             size="sm" 
                             onClick={() => handleRoleDelete(role.id)}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        {/* Hourly Rates Tab */}
+        <TabsContent value="hourlyrates" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center">
+                    <Clock className="h-5 w-5 mr-2" />
+                    Hourly Rates
+                  </CardTitle>
+                  <CardDescription>
+                    Manage hourly wage rates for employees
+                  </CardDescription>
+                </div>
+                <Button onClick={() => {
+                  setEditingHourlyRate(null);
+                  setHourlyRateForm({ employee_id: '', rate_per_hr: '', effective_date: '', end_date: '' });
+                  setIsHourlyRateDialogOpen(true);
+                }}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Hourly Rate
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Employee</TableHead>
+                    <TableHead>Rate (per hour)</TableHead>
+                    <TableHead>Effective Date</TableHead>
+                    <TableHead>End Date</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {hourlyRates.map((rate) => (
+                    <TableRow key={rate.id}>
+                      <TableCell>{rate.employee_name || rate.employee_id}</TableCell>
+                      <TableCell>R{rate.rate_per_hr}</TableCell>
+                      <TableCell>{rate.effective_date}</TableCell>
+                      <TableCell>{rate.end_date || '-'}</TableCell>
+                      <TableCell>
+                        <div className="flex space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleHourlyRateEdit(rate)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleHourlyRateDelete(rate.id)}
                             className="text-red-600 hover:text-red-700"
                           >
                             <Trash2 className="h-4 w-4" />
