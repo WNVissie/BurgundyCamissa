@@ -135,7 +135,10 @@ def get_weekly_approval_trends():
         for week_str, status, count in weekly_data:
             if week_str not in trends:
                 trends[week_str] = {'week': week_str, 'approved': 0, 'pending': 0, 'rejected': 0}
-            if status in trends[week_str]:
+            # Treat both 'approved' and 'accepted' as 'approved' for the chart
+            if status in ['approved', 'accepted']:
+                trends[week_str]['approved'] += count
+            elif status in trends[week_str]:
                 trends[week_str][status] = count
 
         # Sort by week and convert to list
