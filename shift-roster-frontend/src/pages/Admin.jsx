@@ -43,7 +43,8 @@ import {
   Clock,
   AlertCircle,
   Settings,
-  FileText
+  FileText,
+  Briefcase
 } from 'lucide-react';
 
 export function Admin() {
