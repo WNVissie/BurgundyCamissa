@@ -40,5 +40,5 @@ networks:
     driver: bridge
 
 volumes:
-  database:
-  uploads:
+database:
+uploads:
