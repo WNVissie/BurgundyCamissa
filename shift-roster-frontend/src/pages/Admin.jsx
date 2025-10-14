@@ -1,4 +1,56 @@
-  // Hourly Rates management
+// (imports remain unchanged)
+import React, { useState, useEffect } from 'react';
+import { rolesAPI, areasAPI, skillsAPI, shiftsAPI, licensesAPI, designationsAPI, hourlyRatesAPI, employeesAPI } from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { Textarea } from '../components/ui/textarea';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
+import { Badge } from '../components/ui/badge';
+import { Alert, AlertDescription } from '../components/ui/alert';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '../components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../components/ui/table';
+import { 
+  Plus, 
+  Edit, 
+  Trash2, 
+  Trash,
+  Shield, 
+  MapPin, 
+  Award, 
+  Clock,
+  AlertCircle,
+  Settings,
+  FileText,
+  Briefcase
+} from 'lucide-react';
+
+export function Admin() {
+  // --- Hourly Rates logic ---
   const fetchHourlyRates = async () => {
     try {
       const res = await hourlyRatesAPI.getAll();
@@ -60,57 +112,6 @@
       }
     }
   };
-import React, { useState, useEffect } from 'react';
-import { rolesAPI, areasAPI, skillsAPI, shiftsAPI, licensesAPI, designationsAPI, hourlyRatesAPI, employeesAPI } from '../lib/api';
-import { useAuth } from '../contexts/AuthContext';
-import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import { Label } from '../components/ui/label';
-import { Textarea } from '../components/ui/textarea';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
-import { Badge } from '../components/ui/badge';
-import { Alert, AlertDescription } from '../components/ui/alert';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '../components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '../components/ui/table';
-import { 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Trash,
-  Shield, 
-  MapPin, 
-  Award, 
-  Clock,
-  AlertCircle,
-  Settings,
-  FileText,
-  Briefcase
-} from 'lucide-react';
-
-export function Admin() {
   const { user, isAdmin } = useAuth();
   const [roles, setRoles] = useState([]);
   const [areas, setAreas] = useState([]);
