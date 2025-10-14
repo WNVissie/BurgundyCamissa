@@ -424,6 +424,48 @@ export function Admin() {
                           onChange={(e) => setRoleForm({...roleForm, description: e.target.value})}
                         />
                       </div>
+                      
+                      {/* Permissions Section */}
+                      <div className="space-y-3">
+                        <Label className="text-base font-semibold">Permissions</Label>
+                        <div className="grid grid-cols-1 gap-3 p-4 bg-gray-50 rounded-md">
+                          {[
+                            { key: 'manage_employees', label: 'Manage Employees', description: 'Create, edit, delete employees' },
+                            { key: 'manage_shifts', label: 'Manage Shifts', description: 'Create and assign shifts' },
+                            { key: 'approve_timesheets', label: 'Approve Timesheets', description: 'Approve employee timesheets' },
+                            { key: 'manage_leave', label: 'Manage Leave', description: 'Approve/reject leave requests' },
+                            { key: 'view_analytics', label: 'View Analytics', description: 'Access analytics and reports' },
+                            { key: 'view_all_employees', label: 'View All Employees', description: 'See all employee data' },
+                            { key: 'view_own_data', label: 'View Own Data', description: 'View own profile and schedule' },
+                            { key: 'submit_leave', label: 'Submit Leave', description: 'Submit leave requests' },
+                            { key: 'accept_shifts', label: 'Accept Shifts', description: 'Accept assigned shifts' },
+                            { key: 'manage_roles', label: 'Manage Roles', description: 'Create and modify user roles' },
+                          ].map((perm) => (
+                            <div key={perm.key} className="flex items-start space-x-3">
+                              <input
+                                type="checkbox"
+                                id={`perm-${perm.key}`}
+                                checked={roleForm.permissions[perm.key] || false}
+                                onChange={(e) => setRoleForm({
+                                  ...roleForm,
+                                  permissions: {
+                                    ...roleForm.permissions,
+                                    [perm.key]: e.target.checked
+                                  }
+                                })}
+                                className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              />
+                              <div className="flex-1">
+                                <label htmlFor={`perm-${perm.key}`} className="text-sm font-medium cursor-pointer">
+                                  {perm.label}
+                                </label>
+                                <p className="text-xs text-gray-500">{perm.description}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
                       <DialogFooter>
                         <Button type="button" variant="outline" onClick={() => setIsRoleDialogOpen(false)}>
                           Cancel
