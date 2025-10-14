@@ -260,8 +260,8 @@ export function DragDropRoster() {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const startDate = startOfWeek(currentWeek);
-      const endDate = endOfWeek(currentWeek);
+  const startDate = startOfWeek(currentWeek, { weekStartsOn: 1 });
+  const endDate = endOfWeek(currentWeek, { weekStartsOn: 1 });
       
       const [rosterRes, employeesRes, shiftsRes, areasRes] = await Promise.all([
         rosterAPI.getAll({
@@ -340,9 +340,9 @@ export function DragDropRoster() {
   };
 
   const getWeekDays = () => {
-    const start = startOfWeek(currentWeek);
-    const end = endOfWeek(currentWeek);
-    return eachDayOfInterval({ start, end });
+  const start = startOfWeek(currentWeek, { weekStartsOn: 1 });
+  const end = endOfWeek(currentWeek, { weekStartsOn: 1 });
+  return eachDayOfInterval({ start, end });
   };
 
   // helpers in table layout are inlined per cell
