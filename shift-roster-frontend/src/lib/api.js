@@ -136,11 +136,11 @@ export const licensesAPI = {
 
 // Hourly Rates API
 export const hourlyRatesAPI = {
-  getAll: () => api.get('/admin/hourly-rates'),
-  create: (data) => api.post('/admin/hourly-rates', data),
-  update: (id, data) => api.put(`/admin/hourly-rates/${id}`, data),
-  delete: (id) => api.delete(`/admin/hourly-rates/${id}`),
-  getEmployees: () => api.get('/admin/hourly-rates/employees'),
+  getAll: () => api.get('/hourly-rates'),
+  create: (data) => api.post('/hourly-rates', data),
+  update: (id, data) => api.put(`/hourly-rates/${id}`, data),
+  delete: (id) => api.delete(`/hourly-rates/${id}`),
+  getEmployees: () => api.get('/hourly-rates/employees'),
 };
 
 // Leave API
