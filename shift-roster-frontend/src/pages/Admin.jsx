@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { rolesAPI, areasAPI, skillsAPI, shiftsAPI, licensesAPI } from '../lib/api';
+import { rolesAPI, areasAPI, skillsAPI, shiftsAPI, licensesAPI, designationsAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -53,6 +53,7 @@ export function Admin() {
   const [skills, setSkills] = useState([]);
   const [shifts, setShifts] = useState([]);
   const [licenses, setLicenses] = useState([]);
+  const [designations, setDesignations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('roles');
@@ -70,6 +71,7 @@ export function Admin() {
   const [isSkillDialogOpen, setIsSkillDialogOpen] = useState(false);
   const [isShiftDialogOpen, setIsShiftDialogOpen] = useState(false);
   const [isLicenseDialogOpen, setIsLicenseDialogOpen] = useState(false);
+  const [isDesignationDialogOpen, setIsDesignationDialogOpen] = useState(false);
   
   // Form states
   const [roleForm, setRoleForm] = useState({ name: '', description: '', permissions: {} });
@@ -77,6 +79,7 @@ export function Admin() {
   const [skillForm, setSkillForm] = useState({ name: '', description: '', category: '' });
   const [shiftForm, setShiftForm] = useState({ name: '', start_time: '', end_time: '', hours: '', color: '#3498db' });
   const [licenseForm, setLicenseForm] = useState({ name: '', description: '' });
+  const [designationForm, setDesignationForm] = useState({ name: '' });
   
   // Editing states
   const [editingRole, setEditingRole] = useState(null);
@@ -84,6 +87,7 @@ export function Admin() {
   const [editingSkill, setEditingSkill] = useState(null);
   const [editingShift, setEditingShift] = useState(null);
   const [editingLicense, setEditingLicense] = useState(null);
+  const [editingDesignation, setEditingDesignation] = useState(null);
   
   // Error states
   const [licenseError, setLicenseError] = useState(null);
@@ -102,11 +106,13 @@ export function Admin() {
       const skillsRes = await skillsAPI.getAll();
       const shiftsRes = await shiftsAPI.getAll();
       const licensesRes = await licensesAPI.getAll();
+      const designationsRes = await designationsAPI.getAll();
       
       setRoles(rolesRes.data.roles || []);
       setAreas(areasRes.data.areas || []);
       setSkills(skillsRes.data.skills || []);
       setShifts(shiftsRes.data.shifts || []);
+      setDesignations(designationsRes.data || []);
       
       // Handle licenses response structure
       const licensesData = licensesRes.data.licenses || licensesRes.data || [];
@@ -328,6 +334,43 @@ export function Admin() {
     setIsLicenseDialogOpen(true);
   };
 
+  // Designation management
+  const handleDesignationSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      if (editingDesignation) {
+        await designationsAPI.update(editingDesignation.designation_id, designationForm);
+      } else {
+        await designationsAPI.create(designationForm);
+      }
+      fetchData();
+      setIsDesignationDialogOpen(false);
+      setDesignationForm({ name: '' });
+      setEditingDesignation(null);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to save designation');
+    }
+  };
+
+  const handleDesignationEdit = (designation) => {
+    setEditingDesignation(designation);
+    setDesignationForm({
+      name: designation.designation_name
+    });
+    setIsDesignationDialogOpen(true);
+  };
+
+  const handleDesignationDelete = async (id) => {
+    if (window.confirm('Are you sure you want to delete this designation?')) {
+      try {
+        await designationsAPI.delete(id);
+        fetchData();
+      } catch (err) {
+        setError(err.response?.data?.error || 'Failed to delete designation');
+      }
+    }
+  };
+
   // Fetch licenses on mount
   useEffect(() => {
     fetchData();
@@ -365,8 +408,9 @@ export function Admin() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="roles">Roles</TabsTrigger>
+          <TabsTrigger value="designations">Designations</TabsTrigger>
           <TabsTrigger value="areas">Areas</TabsTrigger>
           <TabsTrigger value="skills">Skills</TabsTrigger>
           <TabsTrigger value="shifts">Shifts</TabsTrigger>
@@ -509,6 +553,66 @@ export function Admin() {
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Designations Tab */}
+        <TabsContent value="designations" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center">
+                    <Briefcase className="h-5 w-5 mr-2" />
+                    Designations Management
+                  </CardTitle>
+                  <CardDescription>Manage employee designations and job titles</CardDescription>
+                </div>
+                <Button onClick={() => {
+                  setDesignationForm({ name: '', description: '' });
+                  setEditingDesignation(null);
+                  setIsDesignationDialogOpen(true);
+                }}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Designation
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {designations.map((designation) => (
+                    <TableRow key={designation.id}>
+                      <TableCell className="font-medium">{designation.name}</TableCell>
+                      <TableCell>{designation.description || '-'}</TableCell>
+                      <TableCell className="text-right space-x-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDesignationEdit(designation)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDesignationDelete(designation.id)}
+                        >
+                          <Trash className="h-4 w-4" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -1006,7 +1110,51 @@ export function Admin() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Designation Dialog */}
+      <Dialog open={isDesignationDialogOpen} onOpenChange={setIsDesignationDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {editingDesignation ? 'Edit Designation' : 'Add New Designation'}
+            </DialogTitle>
+            <DialogDescription>
+              {editingDesignation ? 'Update designation information.' : 'Create a new employee designation.'}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleDesignationSubmit} className="space-y-4">
+            <div>
+              <Label htmlFor="designation-name">Designation Name</Label>
+              <Input
+                id="designation-name"
+                value={designationForm.name}
+                onChange={(e) => setDesignationForm({...designationForm, name: e.target.value})}
+                placeholder="e.g., Chef, Supervisor, Manager"
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="designation-description">Description</Label>
+              <Textarea
+                id="designation-description"
+                value={designationForm.description}
+                onChange={(e) => setDesignationForm({...designationForm, description: e.target.value})}
+                placeholder="Optional description of the designation..."
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsDesignationDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit">
+                {editingDesignation ? 'Update Designation' : 'Add Designation'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
 

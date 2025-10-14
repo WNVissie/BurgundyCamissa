@@ -200,6 +200,9 @@ export const reportsAPI = {
 // Designations API
 export const designationsAPI = {
   getAll: () => api.get('/designations'),
+  create: (data) => api.post('/designations', data),
+  update: (id, data) => api.put(`/designations/${id}`, data),
+  delete: (id) => api.delete(`/designations/${id}`),
 };
 
 // Community API
