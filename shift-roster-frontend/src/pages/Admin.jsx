@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { rolesAPI, areasAPI, skillsAPI, shiftsAPI, licensesAPI, designationsAPI } from '../lib/api';
+import { rolesAPI, areasAPI, skillsAPI, shiftsAPI, licensesAPI, designationsAPI, hourlyRatesAPI, employeesAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -56,6 +56,8 @@ export function Admin() {
   const [shifts, setShifts] = useState([]);
   const [licenses, setLicenses] = useState([]);
   const [designations, setDesignations] = useState([]);
+  const [hourlyRates, setHourlyRates] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('roles');
@@ -74,6 +76,7 @@ export function Admin() {
   const [isShiftDialogOpen, setIsShiftDialogOpen] = useState(false);
   const [isLicenseDialogOpen, setIsLicenseDialogOpen] = useState(false);
   const [isDesignationDialogOpen, setIsDesignationDialogOpen] = useState(false);
+  const [isHourlyRateDialogOpen, setIsHourlyRateDialogOpen] = useState(false);
   
   // Form states
   const [roleForm, setRoleForm] = useState({ name: '', description: '', permissions: {} });
@@ -82,6 +85,7 @@ export function Admin() {
   const [shiftForm, setShiftForm] = useState({ name: '', start_time: '', end_time: '', hours: '', color: '#3498db' });
   const [licenseForm, setLicenseForm] = useState({ name: '', description: '' });
   const [designationForm, setDesignationForm] = useState({ name: '' });
+  const [hourlyRateForm, setHourlyRateForm] = useState({ employee_id: '', rate_per_hr: '', effective_date: '', end_date: '' });
   
   // Editing states
   const [editingRole, setEditingRole] = useState(null);
@@ -90,6 +94,7 @@ export function Admin() {
   const [editingShift, setEditingShift] = useState(null);
   const [editingLicense, setEditingLicense] = useState(null);
   const [editingDesignation, setEditingDesignation] = useState(null);
+  const [editingHourlyRate, setEditingHourlyRate] = useState(null);
   
   // Error states
   const [licenseError, setLicenseError] = useState(null);
