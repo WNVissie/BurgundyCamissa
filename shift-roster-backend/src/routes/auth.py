@@ -35,36 +35,10 @@ def google_auth():
         name = data.get('name') or 'Dev'
         surname = data.get('surname') or 'User'
         
-        # Check if user exists by google_id first, then by email as fallback
+        # Only allow login if user exists with this google_id
         user = User.query.filter_by(google_id=google_id).first()
         if not user:
-            user = User.query.filter_by(email=email).first()
-            if user:
-                # Update the google_id for existing user found by email
-                user.google_id = google_id
-                db.session.commit()
-        
-        if not user:
-            # Determine role: Admin for specific email, otherwise Employee
-            if email == 'wanda.nezar@gmail.com':
-                role_name = 'Admin'
-            else:
-                role_name = 'Employee'
-
-            role = Role.query.filter_by(name=role_name).first()
-            if not role:
-                return jsonify({'error': f'Default role "{role_name}" not found'}), 500
-            
-            user = User(
-                google_id=google_id,
-                email=email,
-                name=name,
-                surname=surname,
-                role_id=role.id,
-                contact_no=''  # Provide default empty string for required field
-            )
-            db.session.add(user)
-            db.session.commit()
+            return jsonify({'error': 'Contact HR to assist, you do not yet have access to this system.'}), 403
         
         # Create JWT tokens
         # Identity in JWT should be a string to satisfy PyJWT 'sub' claim requirements
